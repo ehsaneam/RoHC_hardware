@@ -34,3 +34,5 @@ wlsb_hls/wlsb_encoder1/sim/
 wlsb_hls/wlsb_encoder1/script.tcl
 
 *.directive
+
+*.v
