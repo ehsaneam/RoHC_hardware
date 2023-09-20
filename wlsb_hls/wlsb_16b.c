@@ -20,20 +20,23 @@ uint8_t wlsb_get_minkp_16bits(const struct c_wlsb *const wlsb,
 			int16_t computed_p = p;
 			uint8_t i;
 
-			for( i=0 ; i<wlsb->count ; i++ )
+			for( i=0 ; i<4 ; i++ )
 			{
-				const uint16_t v_ref = wlsb->window_value[i];
-				const uint16_t min = v_ref - computed_p;
-				const uint16_t max = min + interval_width;
-
-				if( (min<=max && (value<min || value>max)) ||
-					(min>max && (value<min && value>max)) )
+				if( wlsb->window_used[i] )
 				{
-					break;
+					const uint16_t v_ref = wlsb->window_value[i];
+					const uint16_t min = v_ref - computed_p;
+					const uint16_t max = min + interval_width;
+
+					if( (min<=max && (value<min || value>max)) ||
+						(min>max && (value<min && value>max)) )
+					{
+						break;
+					}
 				}
 			}
 
-			if( i==wlsb->count )
+			if( wlsb->window_used[i]==0 )
 			{
 				break;
 			}
