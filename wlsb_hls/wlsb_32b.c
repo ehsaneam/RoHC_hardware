@@ -1,8 +1,8 @@
 #include "wlsb_32b.h"
 
 uint8_t wlsb_get_minkp_32bits(const struct c_wlsb *const wlsb,
-                                    const uint32_t value,
-                                    const int p)
+								const uint32_t value,
+								const int p)
 {
 	uint8_t bits_nr;
 	if(wlsb->count == 0)
@@ -17,20 +17,26 @@ uint8_t wlsb_get_minkp_32bits(const struct c_wlsb *const wlsb,
 		{
 			const uint32_t interval_width = (1U << k) - 1; /* interval width = 2^k - 1 */
 			int32_t computed_p = p;
-			size_t i;
+			uint8_t i;
+
 			for( i=0 ; i<4 ; i++ )
 			{
-				const uint32_t v_ref = wlsb->window_value[i];
-				const uint32_t min = v_ref - computed_p;
-				const uint32_t max = min + interval_width;
+				uint32_t entry = wlsb->window_value[i];
 
-				if( (min<=max && (value<min || value>max)) ||
-					(min>max && (value<min && value>max)) )
+				if( wlsb->window_used[i] )
 				{
-					break;
+					const uint32_t v_ref = entry;
+					const uint32_t min = v_ref - computed_p;
+					const uint32_t max = min + interval_width;
+
+					if( (min<=max && (value<min || value>max)) ||
+						(min>max && (value<min && value>max)) )
+					{
+						break;
+					}
 				}
 			}
-			if( i==4 )
+			if( wlsb->window_used[i]==0 )
 			{
 				break;
 			}

@@ -1,4 +1,4 @@
-///*
+/*
 #include <stdio.h>
 #include "wlsb_16b.h"
 
@@ -13,7 +13,7 @@ int main()
 	int p[IN_LEN];
 	size_t result_expected[IN_LEN];
 
-	size_t result[IN_LEN];
+	uint8_t result[IN_LEN];
 
 	size_t chert;
 	uint32_t chert2;
@@ -21,34 +21,34 @@ int main()
 	uint8_t chert4;
 
 	FILE *fp;
-	fp=fopen("/home/esi/Projects/rohc_hw/wlsb_hls/resources/inputs","r");
+	fp=fopen("./../../../resources/inputs","r");
 	if( fp==NULL )
 	{
-		printf("file nis");
+		printf("***********************file nis\n");
 		return -1;
 	}
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
-		fscanf(fp, "|win_w:%lu, old:%lu, nxt:%lu, cnt:%lu, bit:%lu, p:%d| ",
+		fscanf(fp, "|win_w:%lu, old:%hhu, nxt:%lu, cnt:%hhu, bit:%lu, p:%lu| ",
 				&chert, &chert4, &chert, &wlsb[i].count,
 				&chert, &chert);
 		for( j=0 ; j<ROHC_WLSB_WIDTH_MAX ; j++ )
 		{
-			fscanf(fp, "(%d,%u,%u)", &chert3, &chert2,
+			fscanf(fp, "(%d,%u,%u)", &wlsb[i].window_used[j], &chert2,
 					&wlsb[i].window_value[j]);
 		}
-		fscanf(fp, " |val:%u, mink:%lu, p:%d, result:%lu|\n", &value[i], &chert, &p[i], &result_expected[i]);
+		fscanf(fp, " |val:%hu, mink:%lu, p:%d, result:%lu|\n", &value[i], &chert, &p[i], &result_expected[i]);
 	}
 	fclose(fp);
 
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
 		result[i] = wlsb_get_minkp_16bits(&wlsb[i], value[i], p[i]);
-		//printf("------------------------>>>>>> %d)%d:%d\n", i, result[i], result_expected[i]);
+		//printf("------------------------>>>>>> %d)%hhu:%lu\n", i, result[i], result_expected[i]);
 		if( result[i]!=result_expected[i] )
 		{
 			failed = 1;
-			printf("***********************inja kharab shod %d)%d:%d\n", i, result[i], result_expected[i]);
+			printf("***********************inja kharab shod %d)%hhu:%lu\n", i, result[i], result_expected[i]);
 			break;
 		}
 	}
@@ -63,9 +63,9 @@ int main()
 	}
 	return failed;
 }
-//*/
+*/
 
-/*
+///*
 #include <stdio.h>
 #include "wlsb_32b.h"
 
@@ -88,23 +88,23 @@ int main()
 	uint8_t chert4;
 
 	FILE *fp;
-	fp=fopen("/home/esi/Projects/rohc_hw/wlsb_hls/resources/inputs32","r");
+	fp=fopen("./../../../resources/inputs32","r");
 	if( fp==NULL )
 	{
-		printf("32-file nis");
+		printf("***********************32-file nis\n");
 		return -1;
 	}
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
-		fscanf(fp, "|win_w:%lu, old:%lu, nxt:%lu, cnt:%lu, bit:%lu, p:%d| ",
-				&chert, &wlsb[i].oldest, &chert, &wlsb[i].count,
+		fscanf(fp, "|win_w:%lu, old:%hhu, nxt:%lu, cnt:%hhu, bit:%lu, p:%lu| ",
+				&chert, &chert4, &chert, &wlsb[i].count,
 				&chert, &chert);
 		for( j=0 ; j<ROHC_WLSB_WIDTH_MAX ; j++ )
 		{
-			fscanf(fp, "(%d,%u,%u)", &chert3, &chert2,
+			fscanf(fp, "(%d,%u,%u)", &wlsb[i].window_used[j], &chert2,
 					&wlsb[i].window_value[j]);
 		}
-		fscanf(fp, " |val:%u, mink:%lu, p:%d, result:%lu|\n", &value[i], &chert, &p[i], &result_expected[i]);
+		fscanf(fp, " |val:%u, mink:%lu, p:%d, result:%hhu|\n", &value[i], &chert, &p[i], &result_expected[i]);
 	}
 	fclose(fp);
 
@@ -130,4 +130,4 @@ int main()
 	}
 	return failed;
 }
-*/
+//*/
