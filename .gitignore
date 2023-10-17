@@ -36,3 +36,7 @@ wlsb_hls/wlsb_encoder1/script.tcl
 *.directive
 
 *.v
+
+tcp_changes/.apc/
+
+tcp_changes/

@@ -1,4 +1,4 @@
-///*
+/*
 #include <stdio.h>
 #include "wlsb_8b.h"
 
@@ -63,7 +63,7 @@ int main()
 	}
 	return failed;
 }
-//*/
+*/
 
 /*
 #include <stdio.h>
@@ -132,7 +132,7 @@ int main()
 }
 */
 
-/*
+///*
 #include <stdio.h>
 #include "wlsb_32b.h"
 
@@ -197,5 +197,5 @@ int main()
 	}
 	return failed;
 }
-*/
+//*/
 
