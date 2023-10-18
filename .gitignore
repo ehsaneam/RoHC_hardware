@@ -25,23 +25,17 @@
 
 *.app
 
+*.project
+
+*.cproject
+
 wlsb_hls/.settings/
-
-wlsb_hls/.cproject
-
-wlsb_hls/.project
-
-wlsb_hls/hls.app
 
 wlsb_hls/.apc/
 
 wlsb_hls/wlsb_encoder1/
 
 tcp_changes/.apc/
-
-decide_state/.cproject
-
-decide_state/.project
 
 decide_state/.settings/
 
@@ -59,10 +53,14 @@ decide_state/solution1/impl/
 
 decide_state/solution1/syn/
 
-tcp_changes/.cproject
-
-tcp_changes/.project
-
 tcp_changes/.settings/
 
 tcp_changes/solution1/
+
+decide_packet/.apc/
+
+uncomp_fields/.settings/
+
+uncomp_fields/.apc/
+
+decide_packet/.settings/
