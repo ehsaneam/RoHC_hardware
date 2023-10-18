@@ -1,26 +1,6 @@
 
 *.log
 
-wlsb_hls/.settings/
-
-wlsb_hls/.cproject
-
-wlsb_hls/.project
-
-*.xml
-
-wlsb_hls/hls.app
-
-wlsb_hls/.apc/
-
-wlsb_hls/wlsb_encoder1/.autopilot/
-
-wlsb_hls/wlsb_encoder1/.debug/
-
-wlsb_hls/wlsb_encoder1/csim/
-
-wlsb_hls/wlsb_encoder1/sim/
-
 *.aps
 
 *.json
@@ -31,15 +11,33 @@ wlsb_hls/wlsb_encoder1/sim/
 
 *.rpt
 
-wlsb_hls/wlsb_encoder1/script.tcl
+*.xml
 
 *.directive
 
 *.v
 
-tcp_changes/.apc/
+*.tcl
 
-tcp_changes/
+*.exe
+
+*.mk
+
+*.app
+
+wlsb_hls/.settings/
+
+wlsb_hls/.cproject
+
+wlsb_hls/.project
+
+wlsb_hls/hls.app
+
+wlsb_hls/.apc/
+
+wlsb_hls/wlsb_encoder1/
+
+tcp_changes/.apc/
 
 decide_state/.cproject
 
@@ -49,17 +47,9 @@ decide_state/.settings/
 
 decide_state/.apc/
 
-*.app
-
 decide_state/solution1/.autopilot/
 
 decide_state/solution1/.debug/
-
-*.tcl
-
-*.exe
-
-*.mk
 
 decide_state/solution1/csim/
 
@@ -68,3 +58,11 @@ decide_state/solution1/sim/
 decide_state/solution1/impl/
 
 decide_state/solution1/syn/
+
+tcp_changes/.cproject
+
+tcp_changes/.project
+
+tcp_changes/.settings/
+
+tcp_changes/solution1/
