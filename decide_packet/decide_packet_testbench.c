@@ -30,7 +30,7 @@ int main()
 				   " behav:%hhu, ipid3:%lu, tll_num:%lu, win_chng:%lu, ack_bit:%lu,"
 				   " win_bit:%lu, seq_chng:%d, ack_flg:%hhu, ack_num_chng:%d, seq_scal:%lu,"
 				   " seq_scal_bit:%lu, ipid1:%lu, ack_scal_bit:%lu, len:%lu, packet_type:%d|\n",
-					&tempo, &contexts[i].ir_count, &contexts[i].fo_count, &contexts[i].so_count,
+					&temp3, &contexts[i].ir_count, &contexts[i].fo_count, &contexts[i].so_count,
 					&contexts[i].specific.tmp.nr_msn_bits, &temp,
 					&contexts[i].specific.tmp.outer_ip_ttl_changed,
 					&contexts[i].specific.tmp.ip_id_behavior_changed, &contexts[i].specific.tmp.ip_df_changed,
