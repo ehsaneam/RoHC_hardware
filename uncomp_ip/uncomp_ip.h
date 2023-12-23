@@ -146,7 +146,6 @@ struct tcphdr
 	uint8_t options[0];          /**< The beginning of the TCP options */
 } __attribute__((packed));
 
-
 struct c_wlsb
 {
 	int p;

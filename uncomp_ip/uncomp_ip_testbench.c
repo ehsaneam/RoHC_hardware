@@ -1,7 +1,6 @@
 #include "uncomp_ip.h"
 
 #define IN_LEN 19
-#define ETH_FRAME_LEN 1514
 
 int main()
 {
