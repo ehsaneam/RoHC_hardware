@@ -161,17 +161,6 @@ struct ipv4_hdr
 
 } __attribute__((packed));
 
-struct ip_packet
-{
-	ip_version version;
-	union
-	{
-		struct ipv4_hdr v4;
-	} header;
-	const uint8_t *data;
-	size_t size;
-};
-
 typedef struct __attribute__((packed)) ipv4_context
 {
 	uint8_t version:4;
