@@ -169,6 +169,7 @@ bool rsf_index_enc_possible(const uint8_t rsf_flags)
 	uint8_t ret = rsf_flags;
 	while( ret )
 	{
+#pragma HLS loop_tripcount min=1 max=3
 		ret += ret & 1;
 		ret >>= 1;
 	}
@@ -275,7 +276,7 @@ bool tcp_is_ack_stride_static(const uint16_t ack_stride, const size_t nr_trans)
 	return (ack_stride == 0 || nr_trans >= ROHC_INIT_TS_STRIDE_MIN);
 }
 
-bool tcp_is_ack_scaled_possible(const uint16_t ack_stride,
+inline bool tcp_is_ack_scaled_possible(const uint16_t ack_stride,
                                 const size_t nr_trans)
 {
 	return (ack_stride != 0 && nr_trans >= ROHC_INIT_TS_STRIDE_MIN);

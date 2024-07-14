@@ -54,6 +54,7 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 	ret = code_cid_values(context->cid, rohc_remain_data, rohc_remain_len, &pos_1st_byte);
 	if(ret < 1)
 	{
+		printf("sag 1\n");
 		return -1;
 	}
 	pos_2nd_byte = ret;
@@ -64,6 +65,7 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 			packet_type, tcp, crc_computed);
 	if(ret < 0)
 	{
+		printf("sag 2\n");
 		return -1;
 	}
 	rohc_remain_data += ret;
@@ -74,6 +76,7 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 	                           rohc_remain_data, rohc_remain_len);
 	if(ret < 0)
 	{
+		printf("sag 3\n");
 		return -1;
 	}
 	rohc_remain_len -= ret;

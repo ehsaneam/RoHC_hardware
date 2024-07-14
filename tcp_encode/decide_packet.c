@@ -69,6 +69,7 @@ rohc_packet_t tcp_decide_FO_SO_packet(const struct rohc_comp_ctxt *const context
 		size_t nr_seq_bits_8191; /* min bits required to encode TCP seqnum with p = 8191 */
 		size_t nr_ack_bits_8191; /* min bits required to encode TCP ACK number with p = 8191 */
 
+//#pragma HLS pipeline
 		nr_seq_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 65535);
 		nr_seq_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 8191);
 		nr_ack_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 8191);
@@ -112,7 +113,42 @@ rohc_packet_t tcp_decide_FO_SO_packet(const struct rohc_comp_ctxt *const context
 	{
 		/* IP_ID_BEHAVIOR_RAND or IP_ID_BEHAVIOR_ZERO:
 		 * co_common or rnd_X packet types */
-		packet_type = tcp_decide_FO_SO_packet_rnd(context, tcp, crc7_at_least);
+//		packet_type = tcp_decide_FO_SO_packet_rnd(context, tcp, crc7_at_least);
+		const uint32_t seq_num_hbo = rohc_bswap32(tcp->seq_num);
+		const uint32_t ack_num_hbo = rohc_bswap32(tcp->ack_num);
+		size_t nr_seq_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 65535);
+		size_t nr_ack_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 65535);
+		size_t nr_seq_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 8191);
+		size_t nr_ack_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 8191);
+		const bool ack_scale_possible = tcp_is_ack_scaled_possible(tcp_context->ack_stride,
+				tcp_context->ack_num_scaling_nr);
+
+		{
+#pragma HLS pipeline
+			packet_type = tcp_decide_FO_SO_packet_rnd123(tcp->rsf_flags, tcp_context->tmp.tcp_window_changed,
+					nr_seq_bits_65535, tcp_context->tmp.nr_ack_bits_16383, nr_ack_bits_65535, crc7_at_least,
+					tcp_context->tmp.tcp_seq_num_changed);
+			if( packet_type==ROHC_PACKET_UNKNOWN )
+			{
+				packet_type = tcp_decide_FO_SO_packet_rnd456(tcp_context->tmp.tcp_window_changed, crc7_at_least,
+						tcp_context->seq_num_scaling_nr, tcp_context->tmp.nr_seq_scaled_bits,
+						tcp_context->tmp.tcp_ack_num_changed, tcp_context->tmp.payload_len, tcp->ack_flag,
+						tcp_context->tmp.nr_ack_scaled_bits, tcp_context->tmp.tcp_seq_num_changed,
+						ack_scale_possible);
+				if( packet_type==ROHC_PACKET_UNKNOWN )
+				{
+					packet_type = tcp_decide_FO_SO_packet_rnd789(tcp->ack_flag, nr_ack_bits_8191, crc7_at_least,
+							tcp_context->tmp.tcp_seq_num_changed, nr_seq_bits_65535,
+							tcp_context->tmp.tcp_ack_num_changed, tcp_context->tmp.nr_ack_bits_16383,
+							tcp_context->seq_num_scaling_nr, tcp_context->tmp.nr_seq_scaled_bits);
+					if( packet_type==ROHC_PACKET_UNKNOWN )
+					{
+						packet_type = tcp_decide_FO_SO_packet_rndab(crc7_at_least, nr_seq_bits_8191, tcp->ack_flag,
+								nr_ack_bits_8191, tcp_context->tmp.nr_ack_bits_16383, nr_seq_bits_65535);
+					}
+				}
+			}
+		}
 	}
 	else
 	{
@@ -284,6 +320,90 @@ rohc_packet_t tcp_decide_FO_SO_packet_seq(const struct rohc_comp_ctxt *const con
 	return packet_type;
 }
 
+rohc_packet_t tcp_decide_FO_SO_packet_rnd123(uint8_t rsf_flags, bool tcp_window_changed,
+			 size_t nr_seq_bits_65535, size_t nr_ack_bits_16383, size_t nr_ack_bits_65535,
+			 const bool crc7_at_least, bool tcp_seq_num_changed)
+{
+	if(rsf_flags != 0 && !tcp_window_changed && nr_seq_bits_65535 <= 16 && nr_ack_bits_16383 <= 16)
+	{
+		return ROHC_PACKET_TCP_RND_8;
+	}
+	else if(rsf_flags != 0)
+	{
+		return ROHC_PACKET_TCP_CO_COMMON;
+	}
+	else if(tcp_window_changed && !crc7_at_least && !tcp_seq_num_changed && nr_ack_bits_65535 <= 18)
+	{
+		return ROHC_PACKET_TCP_RND_7;
+	}
+	else
+	{
+		return ROHC_PACKET_UNKNOWN;
+	}
+}
+
+rohc_packet_t tcp_decide_FO_SO_packet_rnd456(bool tcp_window_changed, const bool crc7_at_least,
+		size_t seq_num_scaling_nr, size_t nr_seq_scaled_bits, bool tcp_ack_num_changed, size_t payload_len,
+		uint8_t ack_flag, size_t nr_ack_scaled_bits, bool tcp_seq_num_changed, bool ack_scale_possible)
+{
+	if(tcp_window_changed)
+	{
+		return ROHC_PACKET_TCP_CO_COMMON;
+	}
+	else if(!crc7_at_least && seq_num_scaling_nr >= ROHC_INIT_TS_STRIDE_MIN && nr_seq_scaled_bits <= 4 &&
+			!tcp_ack_num_changed && payload_len > 0)
+	{
+		return ROHC_PACKET_TCP_RND_2;
+	}
+	else if(!crc7_at_least && !tcp_seq_num_changed && ack_flag != 0 && ack_scale_possible &&
+			nr_ack_scaled_bits <= 4)
+	{
+		return ROHC_PACKET_TCP_RND_4;
+	}
+	else
+	{
+		return ROHC_PACKET_UNKNOWN;
+	}
+}
+rohc_packet_t tcp_decide_FO_SO_packet_rnd789(uint8_t ack_flag, size_t nr_ack_bits_8191, const bool crc7_at_least,
+		bool tcp_seq_num_changed, size_t nr_seq_bits_65535, bool tcp_ack_num_changed, size_t nr_ack_bits_16383,
+		size_t seq_num_scaling_nr, size_t nr_seq_scaled_bits)
+{
+	if(ack_flag != 0 && nr_ack_bits_8191 <= 15 && !crc7_at_least && !tcp_seq_num_changed)
+	{
+		return ROHC_PACKET_TCP_RND_3;
+	}
+	else if(!crc7_at_least && nr_seq_bits_65535 <= 18 && !tcp_ack_num_changed)
+	{
+		return ROHC_PACKET_TCP_RND_1;
+	}
+	else if(ack_flag != 0 && nr_ack_bits_16383 <= 16 && !crc7_at_least &&
+			seq_num_scaling_nr >= ROHC_INIT_TS_STRIDE_MIN &&
+			nr_seq_scaled_bits <= 4)
+	{
+		return ROHC_PACKET_TCP_RND_6;
+	}
+	else
+	{
+		return ROHC_PACKET_UNKNOWN;
+	}
+}
+rohc_packet_t tcp_decide_FO_SO_packet_rndab(const bool crc7_at_least, size_t nr_seq_bits_8191,
+		uint8_t ack_flag, size_t nr_ack_bits_8191, size_t nr_ack_bits_16383, size_t nr_seq_bits_65535)
+{
+	if(!crc7_at_least &&  ack_flag != 0 && nr_ack_bits_8191 <= 15 && nr_seq_bits_8191 <= 14)
+	{
+		return ROHC_PACKET_TCP_RND_5;
+	}
+	else if(nr_ack_bits_16383 <= 16 && nr_seq_bits_65535 <= 16)
+	{
+		return ROHC_PACKET_TCP_RND_8;
+	}
+	else
+	{
+		return ROHC_PACKET_TCP_CO_COMMON;
+	}
+}
 rohc_packet_t tcp_decide_FO_SO_packet_rnd(const struct rohc_comp_ctxt *const context,
                                                  const struct tcphdr *const tcp,
                                                  const bool crc7_at_least)
@@ -291,124 +411,83 @@ rohc_packet_t tcp_decide_FO_SO_packet_rnd(const struct rohc_comp_ctxt *const con
 	const struct sc_tcp_context *tcp_context = &context->specific;
 	const uint32_t seq_num_hbo = rohc_bswap32(tcp->seq_num);
 	const uint32_t ack_num_hbo = rohc_bswap32(tcp->ack_num);
-	size_t nr_seq_bits_65535; /* min bits required to encode TCP seqnum with p = 65535 */
-	size_t nr_seq_bits_8191; /* min bits required to encode TCP seqnum with p = 8191 */
-	size_t nr_ack_bits_8191; /* min bits required to encode TCP ACK number with p = 8191 */
-	rohc_packet_t packet_type;
+	size_t nr_seq_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 65535);
+	size_t nr_ack_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 65535);
+	size_t nr_seq_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 8191);
+	size_t nr_ack_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 8191);
 
-	nr_seq_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 65535);
-	nr_seq_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 8191);
-	nr_ack_bits_8191 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 8191);
+	const bool cond1 = tcp->rsf_flags != 0 && !tcp_context->tmp.tcp_window_changed && nr_seq_bits_65535 <= 16 &&
+			tcp_context->tmp.nr_ack_bits_16383 <= 16;
+	const bool rnd7 = !crc7_at_least && !tcp_context->tmp.tcp_seq_num_changed;
+	const bool cond3 = tcp_context->tmp.tcp_window_changed && rnd7 && nr_ack_bits_65535 <= 18;
+	const bool rnd2 = !crc7_at_least && tcp_context->seq_num_scaling_nr >= ROHC_INIT_TS_STRIDE_MIN &&
+			tcp_context->tmp.nr_seq_scaled_bits <= 4;
+	const bool cond5 = rnd2 && !tcp_context->tmp.tcp_ack_num_changed && tcp_context->tmp.payload_len > 0;
+	const bool rnd4 = tcp_is_ack_scaled_possible(tcp_context->ack_stride, tcp_context->ack_num_scaling_nr);
+	const bool cond6 = rnd7 && tcp->ack_flag != 0 && rnd4 && tcp_context->tmp.nr_ack_scaled_bits <= 4;
+	const bool rnd3 = tcp->ack_flag != 0 && nr_ack_bits_8191 <= 15;
+	const bool cond7 = rnd7 && rnd3;
+	const bool cond8 = !crc7_at_least && nr_seq_bits_65535 <= 18 && !tcp_context->tmp.tcp_ack_num_changed;
+	const bool cond9 = rnd2 && tcp->ack_flag != 0 && tcp_context->tmp.nr_ack_bits_16383 <= 16;
+	const bool conda = !crc7_at_least && rnd3 && nr_seq_bits_8191 <= 14;
+	const bool condb = tcp_context->tmp.nr_ack_bits_16383 <= 16 && nr_seq_bits_65535 <= 16;
+
+	if(cond1)
+	{
+		return ROHC_PACKET_TCP_RND_8;
+	}
 
 	if(tcp->rsf_flags != 0)
 	{
-		if(!tcp_context->tmp.tcp_window_changed &&
-		   nr_seq_bits_65535 <= 16 &&
-		   tcp_context->tmp.nr_ack_bits_16383 <= 16)
-		{
-
-			packet_type = ROHC_PACKET_TCP_RND_8;
-		}
-		else
-		{
-
-			packet_type = ROHC_PACKET_TCP_CO_COMMON;
-		}
+		return ROHC_PACKET_TCP_CO_COMMON;
 	}
-	else /* unchanged structure of the list of TCP options */
+
+	if(cond3)
 	{
-		if(tcp_context->tmp.tcp_window_changed)
-		{
-			size_t nr_ack_bits_65535; /* min bits required to encode ACK number with p = 65535 */
+		return ROHC_PACKET_TCP_RND_7;
+	}
 
-			nr_ack_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->ack_wlsb, ack_num_hbo, 65535);
+	if(tcp_context->tmp.tcp_window_changed)
+	{
+		return ROHC_PACKET_TCP_CO_COMMON;
+	}
 
-			if(!crc7_at_least &&
-			   !tcp_context->tmp.tcp_seq_num_changed &&
-			   nr_ack_bits_65535 <= 18)
-			{
-				/* rnd_7 is possible */
+	if(cond5)
+	{
+		return ROHC_PACKET_TCP_RND_2;
+	}
 
-				packet_type = ROHC_PACKET_TCP_RND_7;
-			}
-			else
-			{
-				/* rnd_7 is not possible, rnd_8 neither so fallback on co_common */
+	if(cond6)
+	{
+		return ROHC_PACKET_TCP_RND_4;
+	}
 
-				packet_type = ROHC_PACKET_TCP_CO_COMMON;
-			}
-		}
-		else if(!crc7_at_least &&
-		        !tcp_context->tmp.tcp_ack_num_changed &&
-		        tcp_context->tmp.payload_len > 0 &&
-		        tcp_context->seq_num_scaling_nr >= ROHC_INIT_TS_STRIDE_MIN &&
-		        tcp_context->tmp.nr_seq_scaled_bits <= 4)
-		{
-			/* rnd_2 is possible */
-			packet_type = ROHC_PACKET_TCP_RND_2;
-		}
-		else if(!crc7_at_least &&
-		        tcp->ack_flag != 0 &&
-		        tcp_is_ack_scaled_possible(tcp_context->ack_stride,
-		                                   tcp_context->ack_num_scaling_nr) &&
-		        tcp_context->tmp.nr_ack_scaled_bits <= 4 &&
-		        !tcp_context->tmp.tcp_seq_num_changed)
-		{
-			/* rnd_4 is possible */
+	if(cond7)
+	{
+		return ROHC_PACKET_TCP_RND_3;
+	}
 
-			packet_type = ROHC_PACKET_TCP_RND_4;
-		}
-		else if(!crc7_at_least &&
-		        tcp->ack_flag != 0 &&
-		        !tcp_context->tmp.tcp_seq_num_changed &&
-		        nr_ack_bits_8191 <= 15)
-		{
-			/* rnd_3 is possible */
+	if(cond8)
+	{
+		return ROHC_PACKET_TCP_RND_1;
+	}
 
-			packet_type = ROHC_PACKET_TCP_RND_3;
-		}
-		else if(!crc7_at_least &&
-		        nr_seq_bits_65535 <= 18 &&
-		        !tcp_context->tmp.tcp_ack_num_changed)
-		{
-			/* rnd_1 is possible */
+	if(cond9)
+	{
+		/* ACK number present */
+		return ROHC_PACKET_TCP_RND_6;
+	}
 
-			packet_type = ROHC_PACKET_TCP_RND_1;
-		}
-		else if(!crc7_at_least &&
-		        tcp->ack_flag != 0 &&
-		        tcp_context->seq_num_scaling_nr >= ROHC_INIT_TS_STRIDE_MIN &&
-		        tcp_context->tmp.nr_seq_scaled_bits <= 4 &&
-		        tcp_context->tmp.nr_ack_bits_16383 <= 16)
-		{
-			/* ACK number present */
-			/* rnd_6 is possible */
-			packet_type = ROHC_PACKET_TCP_RND_6;
-		}
-		else if(!crc7_at_least &&
-		        tcp->ack_flag != 0 &&
-		        nr_seq_bits_8191 <= 14 &&
-		        nr_ack_bits_8191 <= 15)
-		{
-			/* ACK number present */
-			/* rnd_5 is possible */
+	if(conda)
+	{
+		/* ACK number present */
+		return ROHC_PACKET_TCP_RND_5;
+	}
 
-			packet_type = ROHC_PACKET_TCP_RND_5;
-		}
-		else if(/* !tcp_context->tmp.tcp_window_changed && */
-		        tcp_context->tmp.nr_ack_bits_16383 <= 16 &&
-		        nr_seq_bits_65535 <= 16)
-		{
-			/* fallback on rnd_8 */
+	if(condb)
+	{
+		return ROHC_PACKET_TCP_RND_8;
+	}
 
-			packet_type = ROHC_PACKET_TCP_RND_8;
-		}
-		else
-		{
-			/* rnd_8 is not possible, fallback on co_common */
-			packet_type = ROHC_PACKET_TCP_CO_COMMON;
-		}
-	} /* end of case 'unchanged structure of the list of TCP options' */
-
-	return packet_type;
+	return ROHC_PACKET_TCP_CO_COMMON;
 }
