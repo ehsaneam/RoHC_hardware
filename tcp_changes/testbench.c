@@ -32,7 +32,7 @@ int main()
 		uint8_t temp;
 		fscanf(fp, "|cntx-sent:%d, tcp-cntx-msn:%hu, tcp-cntx-ecn-used:%d, "
 				"tcp-cntx-ecn-cnt:%lu, tcp-cntx-ecn-chng:%lu, "
-				"tcp-cntx-ip-cntx-last-id:%hu, uncomp-len:%lu, old:%hhu, uncomp-out-len:%lu, ",
+				"tcp-cntx-ip-cntx-last-id:%hu, uncomp-len:%lu, oldres:%hhu, uncomp-out-len:%lu, ",
 				&contexts[i].num_sent_packets, &contexts[i].specific.msn, &contexts[i].specific.ecn_used,
 				&contexts[i].specific.ecn_used_zero_count, &contexts[i].specific.ecn_used_change_count,
 				&contexts[i].specific.ip_context.last_ip_id, &uncomp_size[i],

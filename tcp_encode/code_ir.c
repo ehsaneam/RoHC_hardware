@@ -22,7 +22,6 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 	                      &first_position);
 	if(ret < 1)
 	{
-		printf("gas 1\n");
 		return -1;
 	}
 	rohc_remain_data += ret;
@@ -42,7 +41,6 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 	/* enough room for profile ID and CRC? */
 	if(rohc_remain_len < 2)
 	{
-		printf("gas 2\n");
 		return -1;
 	}
 
@@ -81,7 +79,6 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 		                        rohc_remain_len);
 		if(ret < 0)
 		{
-			printf("gas 4\n");
 			return -1;
 		}
 		rohc_hdr_len += ret;
@@ -89,7 +86,6 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 	/* IR(-CR|-DYN) header was successfully built, compute the CRC */
 	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len, CRC_INIT_8,
 	                                       compressor.crc_table_8);
-	printf("gas 5 %lu\n", rohc_hdr_len);
 	return rohc_hdr_len;
 }
 
