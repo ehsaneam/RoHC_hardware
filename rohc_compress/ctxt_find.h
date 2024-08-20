@@ -29,19 +29,15 @@ enum
 size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 		const uint8_t *data, const int profile_id_hint,
 		const struct rohc_ts arrival_time);
-const struct rohc_comp_profile* c_get_profile_from_packet(
-		const struct rohc_comp *const comp, const uint8_t *data);
-const struct rohc_comp_profile* rohc_get_profile_from_id(
-		const struct rohc_comp *comp, const int profile_id);
+int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t *data);
 bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 		const uint8_t *data, size_t *const cr_score);
 bool c_tcp_check_profile(const struct rohc_comp *const comp,
 		const uint8_t *data);
 size_t c_create_context(struct rohc_comp *const comp,
-		const struct rohc_comp_profile *const profile, const uint8_t *data,
-		const struct rohc_ts arrival_time);
+		int profile, const uint8_t *data, const struct rohc_ts arrival_time);
 void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
-		const uint8_t *data, size_t wlsb_window_width);
+		const uint8_t *data);
 
 uint16_t ip_fast_csum(const uint8_t *const iph, const size_t ihl);
 bool ipv4_is_fragment(const struct ipv4_hdr *const ipv4);

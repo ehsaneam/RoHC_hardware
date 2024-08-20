@@ -1,14 +1,13 @@
 #include "ctxt_find.h"
 
 unsigned int lcg_rand_seed = 12345; // Initial seed for LCG
-struct rohc_comp_profile c_tcp_profile = {.id = ROHC_PROFILE_TCP,};
 
 size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 		const uint8_t *data, const int profile_id_hint,
 		const struct rohc_ts arrival_time)
 {
 #pragma HLS INTERFACE m_axi port = data depth = 1500
-	const struct rohc_comp_profile *profile;
+	int profile = profile_id_hint;
 	size_t cid_to_use = CID_NOT_USED;
 	size_t num_used_ctxt_seen = 0;
 	size_t i;
@@ -16,19 +15,14 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	if(profile_id_hint < 0)
 	{
 		profile = c_get_profile_from_packet(comp, data);
-	}
-	else
-	{
-		profile = rohc_get_profile_from_id(comp, profile_id_hint);
-	}
-
-	if(profile == NULL)
-	{
-		return CID_NOT_USED;
+		if(profile == -1)
+		{
+			return CID_NOT_USED;
+		}
 	}
 
 	/* get the context using help from the profile we just found */
-	for(i = 0; i <= comp->medium.max_cid; i++)
+	for(i = 0; i <= ROHC_SMALL_CID_MAX; i++)
 	{
 #pragma HLS loop_tripcount min=1 max=16
 		size_t cr_score = 0;
@@ -40,7 +34,7 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 		}
 		num_used_ctxt_seen++;
 
-		if(comp->contexts[i].profile.id != profile->id)
+		if(comp->contexts[i].pid != profile)
 		{
 			continue;
 		}
@@ -56,7 +50,7 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 			break;
 		}
 	}
-	if( cid_to_use==CID_NOT_USED || i > comp->medium.max_cid)
+	if( cid_to_use==CID_NOT_USED || i > ROHC_SMALL_CID_MAX)
 	{
 		printf("FLAG4 %lu\n", cid_to_use);
 		cid_to_use = c_create_context(comp, profile, data, arrival_time);
@@ -75,52 +69,16 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	return cid_to_use;
 }
 
-const struct rohc_comp_profile* c_get_profile_from_packet(const struct rohc_comp *const comp,
-		const uint8_t *data)
+int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t *data)
 {
-	size_t i;
-
-	/* test all compression profiles */
-	for(i = 0; i < C_NUM_PROFILES; i++)
+	if( c_tcp_check_profile(comp, data) )
 	{
-		bool check_profile;
-
-		/* skip profile if the profile is not enabled */
-		if(!comp->enabled_profiles[i])
-		{
-			continue;
-		}
-
-		/* does the profile accept the packet? */
-		check_profile = c_tcp_check_profile(comp, data);
-		if(!check_profile)
-		{
-			continue;
-		}
-
-		/* the packet is compatible with the profile, let's go with it! */
-		return &c_tcp_profile;
+		return ROHC_PROFILE_TCP;
 	}
-
-	return NULL;
-}
-
-const struct rohc_comp_profile* rohc_get_profile_from_id(const struct rohc_comp *comp,
-	                         const int profile_id)
-{
-	size_t i;
-
-	/* test all compression profiles */
-	for(i = 0; i < C_NUM_PROFILES; i++)
+	else
 	{
-		/* if the profile IDs match and the profile is enabled */
-		if(c_tcp_profile.id == profile_id && comp->enabled_profiles[i])
-		{
-			return &c_tcp_profile;
-		}
+		return -1;
 	}
-
-	return NULL;
 }
 
 bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
@@ -200,8 +158,7 @@ bool c_tcp_check_profile(const struct rohc_comp *const comp,
 		return false;
 	}
 
-	if((comp->features & ROHC_COMP_FEATURE_NO_IP_CHECKSUMS) == 0 &&
-		ip_fast_csum(data, ipv4_min_words_nr) != 0)
+	if(ip_fast_csum(data, ipv4_min_words_nr) != 0)
 	{
 		return false;
 	}
@@ -222,21 +179,20 @@ bool c_tcp_check_profile(const struct rohc_comp *const comp,
 }
 
 size_t c_create_context(struct rohc_comp *const comp,
-	                 const struct rohc_comp_profile *const profile,
+	                 int profile,
 					 const uint8_t *data,
 	                 const struct rohc_ts arrival_time)
 {
 	struct rohc_comp_ctxt *c;
 	size_t cid_to_use = 0;
-	size_t win_width = comp->wlsb_window_width;
-	if(comp->num_contexts_used > comp->medium.max_cid)
+	if(comp->num_contexts_used > ROHC_SMALL_CID_MAX)
 	{
 		uint64_t oldest;
 		size_t i;
 
 		/* find the oldest context */
 		oldest = 0xffffffff;
-		for(i = 0; i <= comp->medium.max_cid; i++)
+		for(i = 0; i <= ROHC_SMALL_CID_MAX; i++)
 		{
 #pragma HLS loop_tripcount min=1 max=16
 			if(comp->contexts[i].latest_used < oldest)
@@ -257,7 +213,7 @@ size_t c_create_context(struct rohc_comp *const comp,
 		size_t i;
 
 		/* find the first unused context */
-		for(i = 0; i <= comp->medium.max_cid; i++)
+		for(i = 0; i <= ROHC_SMALL_CID_MAX; i++)
 		{
 #pragma HLS loop_tripcount min=1 max=16
 			if(comp->contexts[i].used == 0)
@@ -275,29 +231,16 @@ size_t c_create_context(struct rohc_comp *const comp,
 	c->fo_count = 0;
 	c->so_count = 0;
 	c->go_back_fo_count = 0;
-	c->go_back_fo_time = arrival_time;
 	c->go_back_ir_count = 0;
-	c->go_back_ir_time = arrival_time;
-
-	c->total_uncompressed_size = 0;
-	c->total_compressed_size = 0;
-	c->header_uncompressed_size = 0;
-	c->header_compressed_size = 0;
-
-	c->total_last_uncompressed_size = 0;
-	c->total_last_compressed_size = 0;
-	c->header_last_uncompressed_size = 0;
-	c->header_last_compressed_size = 0;
-
 	c->num_sent_packets = 0;
 
 	c->cid = cid_to_use;
-	c->profile.id = profile->id;
+	c->pid = profile;
 
 	c->mode = ROHC_U_MODE;
 	c->state = ROHC_COMP_STATE_IR;
 
-	c_tcp_create_from_pkt(c, data, win_width);
+	c_tcp_create_from_pkt(c, data);
 
 	/* if creation is successful, mark the context as used */
 	c->used = 1;
@@ -307,7 +250,7 @@ size_t c_create_context(struct rohc_comp *const comp,
 }
 
 void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
-		const uint8_t *data, size_t wlsb_window_width)
+		const uint8_t *data)
 {
 	struct sc_tcp_context *tcp_context = &(context->specific);
 	const struct tcphdr *tcp;
@@ -355,21 +298,21 @@ void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
 	tcp_context->old_tcphdr.urg_ptr = tcp->urg_ptr;
 
 	/* MSN */
-	wlsb_init(&tcp_context->msn_wlsb, 16, wlsb_window_width, ROHC_LSB_SHIFT_TCP_SN);
+	wlsb_init(&tcp_context->msn_wlsb, 16, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_TCP_SN);
 	/* IP-ID offset */
-	wlsb_init(&tcp_context->ip_id_wlsb, 16, wlsb_window_width, ROHC_LSB_SHIFT_VAR);
+	wlsb_init(&tcp_context->ip_id_wlsb, 16, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_VAR);
 	/* innermost IPv4 TTL or IPv6 Hop Limit */
-	wlsb_init(&tcp_context->ttl_hopl_wlsb, 8, wlsb_window_width, ROHC_LSB_SHIFT_TCP_TTL);
+	wlsb_init(&tcp_context->ttl_hopl_wlsb, 8, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_TCP_TTL);
 	/* TCP window */
-	wlsb_init(&tcp_context->window_wlsb, 16, wlsb_window_width, ROHC_LSB_SHIFT_TCP_WINDOW);
+	wlsb_init(&tcp_context->window_wlsb, 16, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_TCP_WINDOW);
 	/* TCP sequence number */
 	tcp_context->seq_num = rohc_bswap32(tcp->seq_num);
-	wlsb_init(&tcp_context->seq_wlsb, 32, wlsb_window_width, ROHC_LSB_SHIFT_VAR);
-	wlsb_init(&tcp_context->seq_scaled_wlsb, 32, wlsb_window_width, 7);
+	wlsb_init(&tcp_context->seq_wlsb, 32, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_VAR);
+	wlsb_init(&tcp_context->seq_scaled_wlsb, 32, ROHC_WLSB_WIDTH_MAX, 7);
 	/* TCP acknowledgment (ACK) number */
 	tcp_context->ack_num = rohc_bswap32(tcp->ack_num);
-	wlsb_init(&tcp_context->ack_wlsb, 32, wlsb_window_width, ROHC_LSB_SHIFT_VAR);
-	wlsb_init(&tcp_context->ack_scaled_wlsb, 32, wlsb_window_width, 3);
+	wlsb_init(&tcp_context->ack_wlsb, 32, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_VAR);
+	wlsb_init(&tcp_context->ack_scaled_wlsb, 32, ROHC_WLSB_WIDTH_MAX, 3);
 
 	/* init the Master Sequence Number to a random value */
 	tcp_context->msn = lcg_rand() & 0xffff;

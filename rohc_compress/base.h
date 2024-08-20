@@ -16,10 +16,15 @@
 #define ROHC_PACKET_TYPE_IR_DYN 0xF8
 #define IPV4_DF      			0x4000
 
-#define CRC_INIT_3 				0x7
-#define CRC_INIT_7 				0x7f
-#define CRC_INIT_8 				0xff
+#define CHANGE_TO_IR_COUNT  1700
+#define CHANGE_TO_FO_COUNT  700
 
+#define CRC_TABLE_SIZE		256
+#define CRC_INIT_3 			0x7
+#define CRC_INIT_7 			0x7f
+#define CRC_INIT_8 			0xff
+
+#define ROHC_SMALL_CID_MAX  15U
 #define	CID_NOT_USED		1E6
 #define C_NUM_PROFILES 		4U
 #define MAX_CONTEXTS		16U
@@ -44,16 +49,6 @@ typedef enum
 	IP_ID_BEHAVIOR_RAND      = 2, /**< IP-ID is random */
 	IP_ID_BEHAVIOR_ZERO      = 3, /**< IP-ID is constant zero */
 } tcp_ip_id_behavior_t;
-
-typedef enum
-{
-	ROHC_COMP_FEATURE_NONE            = 0,
-	ROHC_COMP_FEATURE_COMPAT_1_6_x    = (1 << 0),
-	ROHC_COMP_FEATURE_NO_IP_CHECKSUMS = (1 << 2),
-	ROHC_COMP_FEATURE_DUMP_PACKETS    = (1 << 3),
-	ROHC_COMP_FEATURE_TIME_BASED_REFRESHES = (1 << 4),
-
-} rohc_comp_features_t;
 
 typedef enum
 {
@@ -280,13 +275,6 @@ struct tcphdr
 	uint8_t options[0];          /**< The beginning of the TCP options */
 } __attribute__((packed));
 
-struct rohc_medium
-{
-	int cid_type;
-	size_t max_cid;
-};
-
-
 struct tcp_tmp_variables
 {
 	uint16_t ip_id_delta;
@@ -360,43 +348,15 @@ struct sc_tcp_context
 	uint32_t seq_num_residue;
 };
 
-struct rohc_comp
-{
-	struct rohc_comp_ctxt contexts[MAX_CONTEXTS];
-	bool enabled_profiles[C_NUM_PROFILES];
-	struct rohc_medium medium;
-
-	int features;
-	size_t wlsb_window_width;
-	size_t num_contexts_used;
-	size_t periodic_refreshes_ir_timeout_pkts;
-	size_t periodic_refreshes_fo_timeout_pkts;
-	uint64_t periodic_refreshes_ir_timeout_time;
-	uint64_t periodic_refreshes_fo_timeout_time;
-	uint8_t crc_table_3[256];
-	uint8_t crc_table_7[256];
-	uint8_t crc_table_8[256];
-};
-
 struct rohc_comp_ctxt
 {
 	struct sc_tcp_context specific;
-	struct rohc_ts go_back_fo_time;
-	struct rohc_ts go_back_ir_time;
 
 	int num_sent_packets;
 	int mode;
 	int state;
 	int pid;
 	int used;
-	int total_uncompressed_size;
-	int total_compressed_size;
-	int header_uncompressed_size;
-	int header_compressed_size;
-	int total_last_uncompressed_size;
-	int total_last_compressed_size;
-	int header_last_uncompressed_size;
-	int header_last_compressed_size;
 
 	size_t cid;
 	size_t ir_count;
@@ -406,6 +366,12 @@ struct rohc_comp_ctxt
 	uint64_t first_used;
 	size_t go_back_fo_count;
 	size_t go_back_ir_count;
+};
+
+struct rohc_comp
+{
+	struct rohc_comp_ctxt contexts[MAX_CONTEXTS];
+	size_t num_contexts_used;
 };
 
 uint8_t wlsb_get_minkp_32bits(const struct c_wlsb *const wlsb,

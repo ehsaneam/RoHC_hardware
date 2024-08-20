@@ -3,7 +3,7 @@
 struct rohc_comp compressor;
 
 int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_pkt_len,
-		struct rohc_ts ip_time, uint8_t *const rohc_pkt, const size_t rohc_pkt_max_len)
+		uint8_t *const rohc_pkt, const size_t rohc_pkt_max_len)
 {
 #pragma HLS INTERFACE m_axi port = ip_pkt depth = 1500
 #pragma HLS INTERFACE m_axi port = rohc_pkt depth = 1500
@@ -17,7 +17,7 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 	tcp_detect_changes(context, ip_pkt, ip_pkt_len);
 
 	/* decide in which state to go */
-	tcp_decide_state(context, ip_time);
+	tcp_decide_state(context);
 
 	/* compute how many bits are needed to send header fields */
 	if(!tcp_encode_uncomp_fields(context, ip_pkt))

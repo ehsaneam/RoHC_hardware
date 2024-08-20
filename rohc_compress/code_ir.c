@@ -1,7 +1,5 @@
 #include "code_ir.h"
 
-extern struct rohc_comp compressor;
-
 int code_IR_packet(struct rohc_comp_ctxt *contecst,
 				  const uint8_t *ip_pkt,
 				  uint8_t *const rohc_pkt,
@@ -84,8 +82,7 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 		rohc_hdr_len += ret;
 	}
 	/* IR(-CR|-DYN) header was successfully built, compute the CRC */
-	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len, CRC_INIT_8,
-	                                       compressor.crc_table_8);
+	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len, CRC_INIT_8);
 	return rohc_hdr_len;
 }
 
@@ -359,17 +356,37 @@ int tcp_code_dynamic_tcp_part(struct sc_tcp_context *const tcp_context,
 }
 
 uint8_t crc_calc_8(const uint8_t *const buf,
-				 const size_t size,
-				 const uint8_t init_val,
-				 const uint8_t *const crc_table)
+				 const size_t size)
 {
-	uint8_t crc = init_val;
 	size_t i;
+	uint8_t crc = CRC_INIT_8;
+	const uint8_t crc_table_8[256] = {
+			0,145,227,114,7,150,228,117,14,159,237,124,9,
+			152,234,123,28,141,255,110,27,138,248,105,18,
+			131,241,96,21,132,246,103,56,169,219,74,63,174,
+			220,77,54,167,213,68,49,160,210,67,36,181,199,
+			86,35,178,192,81,42,187,201,88,45,188,206,95,
+			112,225,147,2,119,230,148,5,126,239,157,12,121,
+			232,154,11,108,253,143,30,107,250,136,25,98,243,
+			129,16,101,244,134,23,72,217,171,58,79,222,172,
+			61,70,215,165,52,65,208,162,51,84,197,183,38,83,
+			194,176,33,90,203,185,40,93,204,190,47,224,113,
+			3,146,231,118,4,149,238,127,13,156,233,120,10,
+			155,252,109,31,142,251,106,24,137,242,99,17,128,
+			245,100,22,135,216,73,59,170,223,78,60,173,214,
+			71,53,164,209,64,50,163,196,85,39,182,195,82,32,
+			177,202,91,41,184,205,92,46,191,144,1,115,226,
+			151,6,116,229,158,15,125,236,153,8,122,235,140,
+			29,111,254,139,26,104,249,130,19,97,240,133,20,
+			102,247,168,57,75,218,175,62,76,221,166,55,69,
+			212,161,48,66,211,180,37,87,198,179,34,80,193,
+			186,43,89,200,189,44,94,207};
+#pragma HLS bind_storage variable=crc_table_8 type=rom_1p impl=bram
 
 	for(i = 0; i < size; i++)
 	{
 #pragma HLS loop_tripcount min=1 max=40
-		crc = crc_table[buf[i] ^ crc];
+		crc = crc_table_8[buf[i] ^ crc];
 	}
 
 	return crc;
