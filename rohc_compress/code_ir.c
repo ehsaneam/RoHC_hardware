@@ -82,7 +82,7 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 		rohc_hdr_len += ret;
 	}
 	/* IR(-CR|-DYN) header was successfully built, compute the CRC */
-	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len, CRC_INIT_8);
+	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len);
 	return rohc_hdr_len;
 }
 

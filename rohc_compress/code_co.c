@@ -1,7 +1,5 @@
 #include "code_co.h"
 
-extern struct rohc_comp compressor;
-
 int code_CO_packet(struct rohc_comp_ctxt *const context,
 				uint8_t *ip_pkt, uint8_t *const rohc_pkt,
 				const size_t rohc_pkt_max_len,
@@ -38,13 +36,11 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 	   packet_type == ROHC_PACKET_TCP_RND_8 ||
 	   packet_type == ROHC_PACKET_TCP_CO_COMMON)
 	{
-		crc_computed = crc_calculate(ROHC_CRC_TYPE_7, ip_pkt, payload_offset,
-		                             CRC_INIT_7, compressor.crc_table_7);
+		crc_computed = crc_calculate(ROHC_CRC_TYPE_7, ip_pkt, payload_offset);
 	}
 	else
 	{
-		crc_computed = crc_calculate(ROHC_CRC_TYPE_3, ip_pkt, payload_offset,
-		                             CRC_INIT_3, compressor.crc_table_3);
+		crc_computed = crc_calculate(ROHC_CRC_TYPE_3, ip_pkt, payload_offset);
 	}
 
 
@@ -1061,8 +1057,7 @@ int variable_length_32_enc(const uint32_t old_value,
 
 uint8_t crc_calculate(const int crc_type,
                       const uint8_t *const data,
-                      const size_t length,
-                      const uint8_t init_val)
+                      const size_t length)
 {
 	uint8_t crc;
 
@@ -1070,10 +1065,10 @@ uint8_t crc_calculate(const int crc_type,
 	switch(crc_type)
 	{
 		case ROHC_CRC_TYPE_7:
-			crc = crc_calc_7(data, length, init_val);
+			crc = crc_calc_7(data, length);
 			break;
 		case ROHC_CRC_TYPE_3:
-			crc = crc_calc_3(data, length, init_val);
+			crc = crc_calc_3(data, length);
 			break;
 		default:
 			/* undefined CRC type, should not happen */

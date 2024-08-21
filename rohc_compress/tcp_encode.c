@@ -66,23 +66,23 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 	/* update the context with the new TCP header */
 //	memcpy(&(tcp_context->old_tcphdr), tcp, sizeof(struct tcphdr));
 
-//	tcp_context->old_tcphdr.seq_num = tcp->seq_num;
-//	tcp_context->old_tcphdr.ack_num = tcp->ack_num;
-//	tcp_context->old_tcphdr.ack_flag = tcp->ack_flag;
-//	tcp_context->old_tcphdr.ecn_flags = tcp->ecn_flags;
-//	tcp_context->old_tcphdr.psh_flag = tcp->psh_flag;
-//	tcp_context->old_tcphdr.res_flags = tcp->res_flags;
-//	tcp_context->old_tcphdr.rsf_flags = tcp->rsf_flags;
-//	tcp_context->old_tcphdr.urg_flag = tcp->urg_flag;
-//	tcp_context->old_tcphdr.urg_ptr = tcp->urg_ptr;
-//	tcp_context->old_tcphdr.checksum = tcp->checksum;
-//	tcp_context->old_tcphdr.window = tcp->window;
-//	tcp_context->old_tcphdr.data_offset = tcp->data_offset;
-//	tcp_context->old_tcphdr.src_port = tcp->src_port;
-//	tcp_context->old_tcphdr.dst_port = tcp->dst_port;
+	tcp_context->old_tcphdr.seq_num = tcp->seq_num;
+	tcp_context->old_tcphdr.ack_num = tcp->ack_num;
+	tcp_context->old_tcphdr.ack_flag = tcp->ack_flag;
+	tcp_context->old_tcphdr.ecn_flags = tcp->ecn_flags;
+	tcp_context->old_tcphdr.psh_flag = tcp->psh_flag;
+	tcp_context->old_tcphdr.res_flags = tcp->res_flags;
+	tcp_context->old_tcphdr.rsf_flags = tcp->rsf_flags;
+	tcp_context->old_tcphdr.urg_flag = tcp->urg_flag;
+	tcp_context->old_tcphdr.urg_ptr = tcp->urg_ptr;
+	tcp_context->old_tcphdr.checksum = tcp->checksum;
+	tcp_context->old_tcphdr.window = tcp->window;
+	tcp_context->old_tcphdr.data_offset = tcp->data_offset;
+	tcp_context->old_tcphdr.src_port = tcp->src_port;
+	tcp_context->old_tcphdr.dst_port = tcp->dst_port;
 
-//	tcp_context->seq_num = rohc_bswap32(tcp->seq_num);
-//	tcp_context->ack_num = rohc_bswap32(tcp->ack_num);
+	tcp_context->seq_num = rohc_bswap32(tcp->seq_num);
+	tcp_context->ack_num = rohc_bswap32(tcp->ack_num);
 
 	/* sequence number */
 	c_add_wlsb(&tcp_context->seq_wlsb, tcp_context->msn, tcp_context->seq_num);
