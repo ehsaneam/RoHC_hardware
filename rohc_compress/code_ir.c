@@ -64,7 +64,6 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 			ret = tcp_code_static_part(ip_pkt, rohc_remain_data, rohc_remain_len);
 			if(ret < 0)
 			{
-				printf("gas 3\n");
 				return -1;
 			}
 			rohc_remain_data += ret;

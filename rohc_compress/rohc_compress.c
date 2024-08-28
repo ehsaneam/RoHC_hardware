@@ -29,7 +29,6 @@ int rohc_compress4(const struct rohc_buf uncomp_packet,
 
 	/* use profile to compress packet */
 	rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_packet.data, uncomp_packet.len, rohc_packet, 2048);
-	printf("-->%d\n", rohc_hdr_size);
 	if(rohc_hdr_size < 0)
 	{
 		/* error while compressing, use the Uncompressed profile

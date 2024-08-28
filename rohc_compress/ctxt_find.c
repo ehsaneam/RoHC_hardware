@@ -52,9 +52,7 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	}
 	if( cid_to_use==CID_NOT_USED || i > ROHC_SMALL_CID_MAX)
 	{
-		printf("FLAG4 %lu\n", cid_to_use);
 		cid_to_use = c_create_context(comp, profile, data, arrival_time);
-		printf("FLAG5 %lu\n", cid_to_use);
 		if( cid_to_use==CID_NOT_USED )
 		{
 			return cid_to_use;
@@ -62,7 +60,6 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	}
 	else
 	{
-		printf("FLAG6 %lu\n", cid_to_use);
 		comp->contexts[cid_to_use].latest_used = arrival_time.sec;
 	}
 
@@ -92,7 +89,6 @@ bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 	const ipv4_context_t *const ip_context = &(tcp_context->ip_context);
 	const struct ipv4_hdr *const ipv4 = (struct ipv4_hdr *) data;
 	/* check source address */
-	printf("FLAG0\n");
 	if(ipv4->saddr != ip_context->src_addr)
 	{
 		return false;
@@ -115,7 +111,6 @@ bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 
 	tcp = (struct tcphdr *) (data + sizeof(struct ipv4_hdr));
 
-	printf("FLAG1 %hu - %hu\n", tcp_context->old_tcphdr.src_port, tcp->src_port);
 	/* check TCP source port */
 	if(tcp_context->old_tcphdr.src_port != tcp->src_port)
 	{
@@ -127,13 +122,11 @@ bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 	}
 	(*cr_score)++;
 
-	printf("FLAG2 %hu - %hu\n", tcp_context->old_tcphdr.dst_port, tcp->dst_port);
 	/* check TCP destination port */
 	if(tcp_context->old_tcphdr.dst_port != tcp->dst_port)
 	{
 		return false;
 	}
-	printf("FLAG3\n");
 	(*cr_score)++;
 
 	return true;
@@ -183,7 +176,6 @@ size_t c_create_context(struct rohc_comp *const comp,
 					 const uint8_t *data,
 	                 const struct rohc_ts arrival_time)
 {
-	struct rohc_comp_ctxt *c;
 	size_t cid_to_use = 0;
 	if(comp->num_contexts_used > ROHC_SMALL_CID_MAX)
 	{
@@ -225,27 +217,26 @@ size_t c_create_context(struct rohc_comp *const comp,
 	}
 
 	/* initialize the previously found context */
-	c = &comp->contexts[cid_to_use];
+	comp->contexts[cid_to_use].ir_count = 0;
+	comp->contexts[cid_to_use].fo_count = 0;
+	comp->contexts[cid_to_use].so_count = 0;
+	comp->contexts[cid_to_use].go_back_fo_count = 0;
+	comp->contexts[cid_to_use].go_back_ir_count = 0;
+	comp->contexts[cid_to_use].num_sent_packets = 0;
 
-	c->ir_count = 0;
-	c->fo_count = 0;
-	c->so_count = 0;
-	c->go_back_fo_count = 0;
-	c->go_back_ir_count = 0;
-	c->num_sent_packets = 0;
+	comp->contexts[cid_to_use].cid = cid_to_use;
+	comp->contexts[cid_to_use].pid = profile;
 
-	c->cid = cid_to_use;
-	c->pid = profile;
+	comp->contexts[cid_to_use].mode = ROHC_U_MODE;
+	comp->contexts[cid_to_use].state = ROHC_COMP_STATE_IR;
 
-	c->mode = ROHC_U_MODE;
-	c->state = ROHC_COMP_STATE_IR;
-
-	c_tcp_create_from_pkt(c, data);
+	c_tcp_create_from_pkt(&comp->contexts[cid_to_use], data);
 
 	/* if creation is successful, mark the context as used */
-	c->used = 1;
-	c->first_used = arrival_time.sec;
-	c->latest_used = arrival_time.sec;
+	comp->contexts[cid_to_use].used = 1;
+	comp->contexts[cid_to_use].first_used = arrival_time.sec;
+	comp->contexts[cid_to_use].latest_used = arrival_time.sec;
+	comp->num_contexts_used++;
 	return cid_to_use;
 }
 

@@ -8,7 +8,7 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 #pragma HLS INTERFACE m_axi port = ip_pkt depth = 1500
 #pragma HLS INTERFACE m_axi port = rohc_pkt depth = 1500
 	struct sc_tcp_context *const tcp_context = &context->specific;
-	struct tcphdr *tcp;
+	struct tcphdr *tcp = (struct tcphdr *)(ip_pkt + sizeof(struct ipv4_hdr));
 	uint8_t bit_cntr = 0;
 
 	tcp_context->packet_type = ROHC_PACKET_UNKNOWN;
@@ -45,7 +45,6 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 		/* co_common, seq_X, or rnd_X */
 		bit_cntr = code_CO_packet(context, ip_pkt, rohc_pkt,
 		                         rohc_pkt_max_len, tcp_context->packet_type);
-		printf("cntr %d %d\n", bit_cntr, bit_cntr<0);
 		if(bit_cntr < 0)
 		{
 			return -1;
@@ -56,7 +55,6 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 
 		bit_cntr = code_IR_packet(context, ip_pkt, rohc_pkt,
 		                         rohc_pkt_max_len, tcp_context->packet_type);
-		printf("cntr %d %d\n", bit_cntr, bit_cntr<0);
 		if(bit_cntr < 0)
 		{
 			return -1;
