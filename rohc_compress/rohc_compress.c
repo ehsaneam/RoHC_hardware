@@ -2,9 +2,10 @@
 
 struct rohc_comp comp;
 
-int rohc_compress4(const struct rohc_buf uncomp_packet,
+int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_t uncomp_len,
 		uint8_t *const rohc_packet, bool reset)
 {
+#pragma HLS INTERFACE m_axi port = uncomp_data depth = 1500
 #pragma HLS INTERFACE m_axi port = rohc_packet depth = 1500
 
 	if( !reset )
@@ -21,14 +22,14 @@ int rohc_compress4(const struct rohc_buf uncomp_packet,
 	size_t payload_offset;
 
 	/* find the best context for the packet */
-	size_t cid = rohc_comp_find_ctxt(&comp, uncomp_packet.data, -1, uncomp_packet.time);
+	size_t cid = rohc_comp_find_ctxt(&comp, uncomp_data, -1, uncomp_time);
 	if(cid == CID_NOT_USED)
 	{
 		return -1;
 	}
 
 	/* use profile to compress packet */
-	rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_packet.data, uncomp_packet.len, rohc_packet, 2048);
+	rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
 	if(rohc_hdr_size < 0)
 	{
 		/* error while compressing, use the Uncompressed profile
@@ -49,15 +50,15 @@ int rohc_compress4(const struct rohc_buf uncomp_packet,
 		}
 
 		/* find the best context for the Uncompressed profile */
-		cid = rohc_comp_find_ctxt(&comp, uncomp_packet.data, ROHC_PROFILE_UNCOMPRESSED,
-		                        uncomp_packet.time);
+		cid = rohc_comp_find_ctxt(&comp, uncomp_data, ROHC_PROFILE_UNCOMPRESSED,
+		                        uncomp_time);
 		if(cid == CID_NOT_USED)
 		{
 			return -1;
 		}
 
 		/* use the Uncompressed profile to compress the packet */
-		rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_packet.data, uncomp_packet.len, rohc_packet, 2048);
+		rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
 		if(rohc_hdr_size < 0)
 		{
 			if(comp.contexts[cid].num_sent_packets <= 1)
@@ -71,13 +72,13 @@ int rohc_compress4(const struct rohc_buf uncomp_packet,
 
 	/* the payload starts after the header, skip it */
 	payload_offset = sizeof(struct ipv4_hdr) + sizeof(struct tcphdr);
-	payload_size   = uncomp_packet.len - payload_offset;
+	payload_size   = uncomp_len - payload_offset;
 
-//	memcpy(rohc_packet + rohc_hdr_size, uncomp_packet.data + payload_offset, payload_size);
+//	memcpy(rohc_packet + rohc_hdr_size, uncomp_data + payload_offset, payload_size);
 	for( int j=0 ; j<payload_size ; j++ )
 	{
 #pragma HLS loop_tripcount min=1 max=1500
-		rohc_packet[rohc_hdr_size + j] = uncomp_packet.data[payload_offset + j];
+		rohc_packet[rohc_hdr_size + j] = uncomp_data[payload_offset + j];
 	}
 
 	comp.contexts[cid].num_sent_packets++;

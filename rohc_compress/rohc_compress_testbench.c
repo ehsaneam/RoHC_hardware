@@ -6,9 +6,11 @@ int main()
 {
 	int i=0, j, failed = 0;
 
-	struct rohc_buf uncomp_packets[IN_LEN];
+	struct rohc_ts uncomp_time[IN_LEN];
+	uint8_t uncomp_data[IN_LEN][2048];
 	uint8_t rohc_packets[IN_LEN][2048];
 	uint8_t exp_rohc_pkts[IN_LEN][2048];
+	size_t uncomp_len[IN_LEN];
 	size_t  exp_rohc_len[IN_LEN];
 	int exp_hdrs_len[IN_LEN];
 
@@ -24,11 +26,11 @@ int main()
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
 		fscanf(fp, "len:%lu, sec:%lu, ns:%lu, uncomp_data:",
-				&uncomp_packets[i].len, &uncomp_packets[i].time.sec,
-				&uncomp_packets[i].time.nsec);
-		for( j=0 ; j<uncomp_packets[i].len ; j++)
+				&uncomp_len[i], &uncomp_time[i].sec,
+				&uncomp_time[i].nsec);
+		for( j=0 ; j<uncomp_len[i] ; j++)
 		{
-			fscanf(fp, "%hhu ", &uncomp_packets[i].data[j]);
+			fscanf(fp, "%hhu ", &uncomp_data[i][j]);
 		}
 		fscanf(fp, ", rohc_len:%lu, hdr_len:%d, rohc_data:", &exp_rohc_len[i], &exp_hdrs_len[i]);
 		for( j=0 ; j<exp_rohc_len[i] ; j++)
@@ -51,7 +53,7 @@ int main()
 		{
 			reset = 1;
 		}
-		int ret = rohc_compress4(uncomp_packets[i], rohc_packets[i], reset);
+		int ret = rohc_compress4(uncomp_data[i], uncomp_time[i], uncomp_len[i], rohc_packets[i], reset);
 
 		if( ret!=exp_hdrs_len[i] )
 		{
