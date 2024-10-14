@@ -110,3 +110,11 @@ rohc_compress/.apc/
 rohc_compress/solution1/
 
 rohc_compress/solution2/
+
+rohc_compress_wrapper/.apc/
+
+rohc_compress_wrapper/.settings/
+
+rohc_compress_wrapper/solution1/
+
+rohc_compress_wrapper/solution2/
