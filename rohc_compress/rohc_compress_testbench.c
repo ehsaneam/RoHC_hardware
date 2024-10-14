@@ -6,7 +6,7 @@ int main()
 {
 	int i=0, j, failed = 0;
 
-	struct rohc_ts uncomp_time[IN_LEN];
+	uint16_t uncomp_time[IN_LEN];
 	uint8_t uncomp_data[IN_LEN][2048];
 	uint8_t rohc_packets[IN_LEN][2048];
 	uint8_t exp_rohc_pkts[IN_LEN][2048];
@@ -25,9 +25,8 @@ int main()
 
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
-		fscanf(fp, "len:%lu, sec:%lu, ns:%lu, uncomp_data:",
-				&uncomp_len[i], &uncomp_time[i].sec,
-				&uncomp_time[i].nsec);
+		fscanf(fp, "len:%lu, sec:%lu, uncomp_data:",
+				&uncomp_len[i], &uncomp_time);
 		for( j=0 ; j<uncomp_len[i] ; j++)
 		{
 			fscanf(fp, "%hhu ", &uncomp_data[i][j]);

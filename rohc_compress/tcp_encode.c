@@ -11,7 +11,7 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 	struct tcphdr *tcp = (struct tcphdr *)(ip_pkt + sizeof(struct ipv4_hdr));
 	uint8_t bit_cntr = 0;
 
-	tcp_context->packet_type = ROHC_PACKET_UNKNOWN;
+	context->packet_type = ROHC_PACKET_UNKNOWN;
 
 	/* detect changes between new uncompressed packet and context */
 	tcp_detect_changes(context, ip_pkt, ip_pkt_len);
@@ -26,25 +26,25 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 	}
 
 	/* decide which packet to send */
-	tcp_context->packet_type = tcp_decide_packet(context, ip_pkt);
+	context->packet_type = tcp_decide_packet(context, ip_pkt);
 
 	/* does the packet update the decompressor context? */
-	if(rohc_packet_carry_crc_7_or_8(tcp_context->packet_type))
+	if(rohc_packet_carry_crc_7_or_8(context->packet_type))
 	{
 		tcp_context->msn_of_last_ctxt_updating_pkt = tcp_context->msn;
 	}
 
 	/* code the chosen packet */
-	if(tcp_context->packet_type == ROHC_PACKET_UNKNOWN)
+	if(context->packet_type == ROHC_PACKET_UNKNOWN)
 	{
 		return -1;
 	}
-	else if(tcp_context->packet_type != ROHC_PACKET_IR &&
-			tcp_context->packet_type != ROHC_PACKET_IR_DYN)
+	else if(context->packet_type != ROHC_PACKET_IR &&
+			context->packet_type != ROHC_PACKET_IR_DYN)
 	{
 		/* co_common, seq_X, or rnd_X */
 		bit_cntr = code_CO_packet(context, ip_pkt, rohc_pkt,
-		                         rohc_pkt_max_len, tcp_context->packet_type);
+		                         rohc_pkt_max_len, context->packet_type);
 		if(bit_cntr < 0)
 		{
 			return -1;
@@ -54,7 +54,7 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 	{
 
 		bit_cntr = code_IR_packet(context, ip_pkt, rohc_pkt,
-		                         rohc_pkt_max_len, tcp_context->packet_type);
+		                         rohc_pkt_max_len, context->packet_type);
 		if(bit_cntr < 0)
 		{
 			return -1;
@@ -114,3 +114,50 @@ int c_tcp_encode(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt, int ip_p
 
 	return bit_cntr;
 }
+
+void tcp_decide_state(struct rohc_comp_ctxt *const context)
+{
+	const rohc_comp_state_t curr_state = context->state;
+	rohc_comp_state_t next_state;
+
+	if(curr_state == ROHC_COMP_STATE_IR)
+	{
+		if(context->ir_count < MAX_IR_COUNT)
+		{
+			next_state = ROHC_COMP_STATE_IR;
+		}
+		else
+		{
+			next_state = ROHC_COMP_STATE_SO;
+		}
+	}
+	else if(curr_state == ROHC_COMP_STATE_FO)
+	{
+		if(context->fo_count < MAX_FO_COUNT)
+		{
+			next_state = ROHC_COMP_STATE_FO;
+		}
+		else
+		{
+			next_state = ROHC_COMP_STATE_SO;
+		}
+	}
+	else if(curr_state == ROHC_COMP_STATE_SO)
+	{
+		/* do not change state */
+		next_state = ROHC_COMP_STATE_SO;
+	}
+	else
+	{
+		return;
+	}
+
+	rohc_comp_change_state(context, next_state);
+
+	/* periodic context refreshes (RFC6846, §5.2.1.2) */
+	if(context->mode == ROHC_U_MODE)
+	{
+		rohc_comp_periodic_down_transition(context);
+	}
+}
+

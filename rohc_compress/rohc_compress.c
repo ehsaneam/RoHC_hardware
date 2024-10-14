@@ -2,7 +2,7 @@
 
 struct rohc_comp comp;
 
-int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_t uncomp_len,
+int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t uncomp_len,
 		uint8_t *const rohc_packet, bool reset)
 {
 #pragma HLS INTERFACE m_axi port = uncomp_data depth = 1500
@@ -29,7 +29,15 @@ int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_
 	}
 
 	/* use profile to compress packet */
-	rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+	if( comp.contexts[cid].pid==ROHC_PROFILE_TCP )
+	{
+		rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+	}
+	else
+	{
+		rohc_hdr_size = c_uncompressed_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+	}
+
 	if(rohc_hdr_size < 0)
 	{
 		/* error while compressing, use the Uncompressed profile
@@ -58,7 +66,15 @@ int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_
 		}
 
 		/* use the Uncompressed profile to compress the packet */
-		rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+		if( comp.contexts[cid].pid==ROHC_PROFILE_TCP )
+		{
+			rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+		}
+		else
+		{
+			rohc_hdr_size = c_uncompressed_encode(&comp.contexts[cid], uncomp_data, uncomp_len,
+					rohc_packet, 2048);
+		}
 		if(rohc_hdr_size < 0)
 		{
 			if(comp.contexts[cid].num_sent_packets <= 1)
@@ -71,7 +87,7 @@ int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_
 	}
 
 	/* the payload starts after the header, skip it */
-	payload_offset = sizeof(struct ipv4_hdr) + sizeof(struct tcphdr);
+	payload_offset = rohc_get_payload_offset(cid);
 	payload_size   = uncomp_len - payload_offset;
 
 //	memcpy(rohc_packet + rohc_hdr_size, uncomp_data + payload_offset, payload_size);
@@ -86,3 +102,24 @@ int rohc_compress4(uint8_t *const uncomp_data, struct rohc_ts uncomp_time, size_
 	return rohc_hdr_size;
 }
 
+int rohc_get_payload_offset(size_t cid)
+{
+	size_t payload_offset;
+
+	if( comp.contexts[cid].pid==ROHC_PROFILE_TCP )
+	{
+		payload_offset = sizeof(struct ipv4_hdr) + sizeof(struct tcphdr);
+	}
+	else
+	{
+		if( comp.contexts[cid].packet_type==ROHC_PACKET_IR )
+		{
+			payload_offset = 0;
+		}
+		else
+		{
+			payload_offset = 1;
+		}
+	}
+	return payload_offset;
+}

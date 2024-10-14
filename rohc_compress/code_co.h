@@ -688,6 +688,3 @@ int variable_length_32_enc(const uint32_t old_value,
                            uint8_t *const rohc_data,
                            const size_t rohc_max_len,
                            int *const indicator);
-uint8_t crc_calculate(const int crc_type, const uint8_t *const data, const size_t length);
-uint8_t crc_calc_7(const uint8_t *const buf, const size_t size);
-uint8_t crc_calc_3(const uint8_t *const buf, const size_t size);

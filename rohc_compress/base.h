@@ -140,12 +140,6 @@ typedef enum
 	ROHC_PACKET_MAX                 /**< The number of packet types */
 } rohc_packet_t;
 
-struct rohc_ts
-{
-	uint64_t sec;   /**< The seconds part of the timestamp */
-	uint64_t nsec;  /**< The nanoseconds part of the timestamp */
-};
-
 struct c_wlsb
 {
 	int p;
@@ -180,6 +174,12 @@ typedef struct __attribute__((packed)) ipv4_context
 	uint32_t dst_addr;
 
 } ipv4_context_t;
+
+struct ip_hdr
+{
+	uint8_t reserved:4;
+	uint8_t version:4;
+} __attribute__((packed));
 
 struct ipv4_hdr
 {
@@ -323,7 +323,6 @@ struct sc_tcp_context
 
 	bool ecn_used;
 	int tcp_seq_num_change_count;
-	int packet_type;
 
 	size_t ecn_used_change_count;
 	size_t ecn_used_zero_count;
@@ -352,6 +351,7 @@ struct rohc_comp_ctxt
 {
 	struct sc_tcp_context specific;
 
+	int packet_type;
 	int num_sent_packets;
 	int mode;
 	int state;
@@ -363,7 +363,6 @@ struct rohc_comp_ctxt
 	size_t fo_count;
 	size_t so_count;
 	uint64_t latest_used;
-	uint64_t first_used;
 	size_t go_back_fo_count;
 	size_t go_back_ir_count;
 };
@@ -373,6 +372,10 @@ struct rohc_comp
 	struct rohc_comp_ctxt contexts[MAX_CONTEXTS];
 	size_t num_contexts_used;
 };
+
+void rohc_comp_periodic_down_transition(struct rohc_comp_ctxt *const context);
+void rohc_comp_change_state(struct rohc_comp_ctxt *const context,
+                            const int new_state);
 
 uint8_t wlsb_get_minkp_32bits(const struct c_wlsb *const wlsb,
 		const uint32_t value, const int p);
@@ -404,3 +407,6 @@ bool tcp_is_ack_scaled_possible(const uint16_t ack_stride,
 uint32_t rohc_bswap32(const uint32_t value);
 uint16_t rohc_bswap16(const uint16_t value);
 uint16_t swab16(const uint16_t value);
+uint8_t crc_calc_8(const uint8_t *const buf, const size_t size);
+uint8_t crc_calc_7(const uint8_t *const buf, const size_t size);
+uint8_t crc_calc_3(const uint8_t *const buf, const size_t size);

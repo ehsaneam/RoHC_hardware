@@ -3,8 +3,7 @@
 unsigned int lcg_rand_seed = 12345; // Initial seed for LCG
 
 size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
-		const uint8_t *data, const int profile_id_hint,
-		const struct rohc_ts arrival_time)
+		const uint8_t *data, const int profile_id_hint, uint16_t arrival_time)
 {
 #pragma HLS INTERFACE m_axi port = data depth = 1500
 	int profile = profile_id_hint;
@@ -15,10 +14,6 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	if(profile_id_hint < 0)
 	{
 		profile = c_get_profile_from_packet(comp, data);
-		if(profile == -1)
-		{
-			return CID_NOT_USED;
-		}
 	}
 
 	/* get the context using help from the profile we just found */
@@ -39,9 +34,16 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 			continue;
 		}
 
-		if( c_tcp_check_context(&comp->contexts[i].specific, data, &cr_score) )
+		if( profile==ROHC_PROFILE_TCP )
 		{
-			break;
+			if( c_tcp_check_context(&comp->contexts[i].specific, data, &cr_score) )
+			{
+				break;
+			}
+		}
+		else
+		{
+			break;	// always true!
 		}
 
 		if(num_used_ctxt_seen >= comp->num_contexts_used)
@@ -60,7 +62,7 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	}
 	else
 	{
-		comp->contexts[cid_to_use].latest_used = arrival_time.sec;
+		comp->contexts[cid_to_use].latest_used = arrival_time;
 	}
 
 	return cid_to_use;
@@ -74,7 +76,7 @@ int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t 
 	}
 	else
 	{
-		return -1;
+		return ROHC_PROFILE_UNCOMPRESSED;
 	}
 }
 
@@ -171,10 +173,8 @@ bool c_tcp_check_profile(const struct rohc_comp *const comp,
 	return true;
 }
 
-size_t c_create_context(struct rohc_comp *const comp,
-	                 int profile,
-					 const uint8_t *data,
-	                 const struct rohc_ts arrival_time)
+size_t c_create_context(struct rohc_comp *const comp, int profile,
+					 const uint8_t *data, uint16_t arrival_time)
 {
 	size_t cid_to_use = 0;
 	if(comp->num_contexts_used > ROHC_SMALL_CID_MAX)
@@ -230,12 +230,14 @@ size_t c_create_context(struct rohc_comp *const comp,
 	comp->contexts[cid_to_use].mode = ROHC_U_MODE;
 	comp->contexts[cid_to_use].state = ROHC_COMP_STATE_IR;
 
-	c_tcp_create_from_pkt(&comp->contexts[cid_to_use], data);
+	if( profile==ROHC_PROFILE_TCP )
+	{
+		c_tcp_create_from_pkt(&comp->contexts[cid_to_use], data);
+	}
 
 	/* if creation is successful, mark the context as used */
 	comp->contexts[cid_to_use].used = 1;
-	comp->contexts[cid_to_use].first_used = arrival_time.sec;
-	comp->contexts[cid_to_use].latest_used = arrival_time.sec;
+	comp->contexts[cid_to_use].latest_used = arrival_time;
 	comp->num_contexts_used++;
 	return cid_to_use;
 }

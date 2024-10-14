@@ -36,11 +36,11 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 	   packet_type == ROHC_PACKET_TCP_RND_8 ||
 	   packet_type == ROHC_PACKET_TCP_CO_COMMON)
 	{
-		crc_computed = crc_calculate(ROHC_CRC_TYPE_7, ip_pkt, payload_offset);
+		crc_computed = crc_calc_7(ip_pkt, payload_offset);
 	}
 	else
 	{
-		crc_computed = crc_calculate(ROHC_CRC_TYPE_3, ip_pkt, payload_offset);
+		crc_computed = crc_calc_3(ip_pkt, payload_offset);
 	}
 
 
@@ -1053,90 +1053,4 @@ int variable_length_32_enc(const uint32_t old_value,
 
 
 	return encoded_len;
-}
-
-uint8_t crc_calculate(const int crc_type,
-                      const uint8_t *const data,
-                      const size_t length)
-{
-	uint8_t crc;
-
-	/* call the function that corresponds to the CRC type */
-	switch(crc_type)
-	{
-		case ROHC_CRC_TYPE_7:
-			crc = crc_calc_7(data, length);
-			break;
-		case ROHC_CRC_TYPE_3:
-			crc = crc_calc_3(data, length);
-			break;
-		default:
-			/* undefined CRC type, should not happen */
-			crc = 0;
-			break;
-	}
-
-	return crc;
-}
-
-uint8_t crc_calc_7(const uint8_t *const buf, const size_t size)
-{
-	size_t i;
-	uint8_t crc = CRC_INIT_7;
-	const uint8_t crc_table_7[256] = {
-			0,64,115,51,21,85,102,38,42,106,89,25,63,127,
-			76,12,84,20,39,103,65,1,50,114,126,62,13,77,
-			107,43,24,88,91,27,40,104,78,14,61,125,113,49,
-			2,66,100,36,23,87,15,79,124,60,26,90,105,41,
-			37,101,86,22,48,112,67,3,69,5,54,118,80,16,35,
-			99,111,47,28,92,122,58,9,73,17,81,98,34,4,68,
-			119,55,59,123,72,8,46,110,93,29,30,94,109,45,
-			11,75,120,56,52,116,71,7,33,97,82,18,74,10,57,
-			121,95,31,44,108,96,32,19,83,117,53,6,70,121,
-			57,10,74,108,44,31,95,83,19,32,96,70,6,53,117,
-			45,109,94,30,56,120,75,11,7,71,116,52,18,82,
-			97,33,34,98,81,17,55,119,68,4,8,72,123,59,29,
-			93,110,46,118,54,5,69,99,35,16,80,92,28,47,111,
-			73,9,58,122,60,124,79,15,41,105,90,26,22,86,
-			101,37,3,67,112,48,104,40,27,91,125,61,14,78,
-			66,2,49,113,87,23,36,100,103,39,20,84,114,50,
-			1,65,77,13,62,126,88,24,43,107,51,115,64,0,38,
-			102,85,21,25,89,106,42,12,76,127,63};
-#pragma HLS bind_storage variable=crc_table_7 type=rom_1p impl=bram
-
-	for(i = 0; i < size; i++)
-	{
-#pragma HLS loop_tripcount min=1 max=40
-		crc = crc_table_7[buf[i] ^ (crc & 127)];
-	}
-
-	return crc;
-}
-
-uint8_t crc_calc_3(const uint8_t *const buf, const size_t size)
-{
-	size_t i;
-	uint8_t crc = CRC_INIT_3;
-	const uint8_t crc_table_3[256] = {
-			0,6,1,7,2,4,3,5,4,2,5,3,6,0,7,1,5,3,4,2,7,1,6,
-			0,1,7,0,6,3,5,2,4,7,1,6,0,5,3,4,2,3,5,2,4,1,7,
-			0,6,2,4,3,5,0,6,1,7,6,0,7,1,4,2,5,3,3,5,2,4,1,
-			7,0,6,7,1,6,0,5,3,4,2,6,0,7,1,4,2,5,3,2,4,3,5,
-			0,6,1,7,4,2,5,3,6,0,7,1,0,6,1,7,2,4,3,5,1,7,0,
-			6,3,5,2,4,5,3,4,2,7,1,6,0,6,0,7,1,4,2,5,3,2,4,
-			3,5,0,6,1,7,3,5,2,4,1,7,0,6,7,1,6,0,5,3,4,2,1,
-			7,0,6,3,5,2,4,5,3,4,2,7,1,6,0,4,2,5,3,6,0,7,1,
-			0,6,1,7,2,4,3,5,5,3,4,2,7,1,6,0,1,7,0,6,3,5,2,
-			4,0,6,1,7,2,4,3,5,4,2,5,3,6,0,7,1,2,4,3,5,0,6,
-			1,7,6,0,7,1,4,2,5,3,7,1,6,0,5,3,4,2,3,5,2,4,1,
-			7,0,6};
-#pragma HLS bind_storage variable=crc_table_3 type=rom_1p impl=bram
-
-	for(i = 0; i < size; i++)
-	{
-#pragma HLS loop_tripcount min=1 max=40
-		crc = crc_table_3[buf[i] ^ (crc & 7)];
-	}
-
-	return crc;
 }

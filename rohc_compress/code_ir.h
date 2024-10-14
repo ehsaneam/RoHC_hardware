@@ -124,8 +124,6 @@ int tcp_code_dynamic_tcp_part(struct sc_tcp_context *const tcp_context,
 							 const struct tcphdr *const tcp,
 							 uint8_t *const rohc_data,
 							 const size_t rohc_max_len);
-uint8_t crc_calc_8(const uint8_t *const buf, const size_t size);
-
 int c_zero_or_irreg16(const uint16_t packet_value,
                       uint8_t *const rohc_data,
                       const size_t rohc_max_len,

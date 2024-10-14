@@ -28,14 +28,14 @@ enum
 
 size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 		const uint8_t *data, const int profile_id_hint,
-		const struct rohc_ts arrival_time);
+		uint16_t arrival_time);
 int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t *data);
 bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 		const uint8_t *data, size_t *const cr_score);
 bool c_tcp_check_profile(const struct rohc_comp *const comp,
 		const uint8_t *data);
 size_t c_create_context(struct rohc_comp *const comp,
-		int profile, const uint8_t *data, const struct rohc_ts arrival_time);
+		int profile, const uint8_t *data, uint16_t arrival_time);
 void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
 		const uint8_t *data);
 
