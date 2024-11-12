@@ -20,7 +20,6 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 	for(i = 0; i <= ROHC_SMALL_CID_MAX; i++)
 	{
 #pragma HLS loop_tripcount min=1 max=16
-		size_t cr_score = 0;
 		cid_to_use = i;
 
 		if(!comp->contexts[i].used)
@@ -36,14 +35,21 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 
 		if( profile==ROHC_PROFILE_TCP )
 		{
-			if( c_tcp_check_context(&comp->contexts[i].specific, data, &cr_score) )
+			if( c_tcp_check_context(&comp->contexts[i].tcp_specific, data) )
 			{
 				break;
 			}
 		}
-		else
+		else if( profile==ROHC_PROFILE_UDP )
 		{
-			break;	// always true!
+			if( c_udp_check_context(&comp->contexts[i].rfc3095_specific, data) )
+			{
+				break;
+			}
+		}
+		else // uncompressed profile is always true!
+		{
+			break;
 		}
 
 		if(num_used_ctxt_seen >= comp->num_contexts_used)
@@ -70,9 +76,13 @@ size_t rohc_comp_find_ctxt(struct rohc_comp *const comp,
 
 int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t *data)
 {
-	if( c_tcp_check_profile(comp, data) )
+	if( c_tcp_check_profile(data) )
 	{
 		return ROHC_PROFILE_TCP;
+	}
+	else if( c_udp_check_profile(data) )
+	{
+		return ROHC_PROFILE_UDP;
 	}
 	else
 	{
@@ -81,13 +91,10 @@ int c_get_profile_from_packet(const struct rohc_comp *const comp, const uint8_t 
 }
 
 bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
-		const uint8_t *data, size_t *const cr_score)
+		const uint8_t *data)
 {
 	uint8_t next_proto;
 	const struct tcphdr *tcp;
-
-	(*cr_score) = 0;
-
 	const ipv4_context_t *const ip_context = &(tcp_context->ip_context);
 	const struct ipv4_hdr *const ipv4 = (struct ipv4_hdr *) data;
 	/* check source address */
@@ -108,34 +115,45 @@ bool c_tcp_check_context(struct sc_tcp_context *tcp_context,
 		return false;
 	}
 
-	/* the packet matches the context enough to use Context Replication */
-	(*cr_score)++;
-
 	tcp = (struct tcphdr *) (data + sizeof(struct ipv4_hdr));
 
-	/* check TCP source port */
-	if(tcp_context->old_tcphdr.src_port != tcp->src_port)
-	{
-		if(!rsf_index_enc_possible(tcp->rsf_flags))
-		{
-			(*cr_score) = 0;
-		}
-		return false;
-	}
-	(*cr_score)++;
-
-	/* check TCP destination port */
-	if(tcp_context->old_tcphdr.dst_port != tcp->dst_port)
+	if(tcp_context->old_tcphdr.src_port != tcp->src_port || tcp_context->old_tcphdr.dst_port != tcp->dst_port)
 	{
 		return false;
 	}
-	(*cr_score)++;
 
 	return true;
 }
 
-bool c_tcp_check_profile(const struct rohc_comp *const comp,
-		const uint8_t *data)
+bool c_udp_check_context(struct rohc_comp_rfc3095_ctxt *const rfc3095_ctxt, const uint8_t *data)
+{
+	const struct ipv4_hdr *const ipv4_hdr = (struct ipv4_hdr *) data;
+	struct ip_header_info *ip_flags;
+
+	ip_flags = &rfc3095_ctxt->outer_ip_flags;
+
+	if(ipv4_hdr->version != 4)
+	{
+		return false;
+	}
+	if( ip_flags->info.v4.old_ip.saddr != ipv4_hdr->saddr ||
+		ip_flags->info.v4.old_ip.daddr != ipv4_hdr->daddr )
+	{
+		return false;
+	}
+
+
+	struct sc_udp_context *udp_context = &rfc3095_ctxt->specific;
+	const struct udphdr *udp_header = (const struct udphdr *) (data + sizeof(struct ipv4_hdr));
+	if(udp_context->old_udp.source != udp_header->source || udp_context->old_udp.dest != udp_header->dest)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool c_tcp_check_profile(const uint8_t *data)
 {
 	uint8_t next_proto;
 	const struct tcphdr *tcp_header;
@@ -159,13 +177,42 @@ bool c_tcp_check_profile(const struct rohc_comp *const comp,
 	}
 
 	next_proto = ipv4->protocol;
-	if(next_proto != ROHC_IPPROTO_TCP)
+	if(next_proto != ROHC_IPPROTO_TCP )
 	{
 		return false;
 	}
 
 	tcp_header = (const struct tcphdr *) (data + sizeof(struct ipv4_hdr));
 	if(tcp_header->data_offset < 5)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool c_udp_check_profile(const uint8_t *data)
+{
+	const struct ip_hdr *const ip_hdr = (struct ip_hdr *) data;
+	if(ip_hdr->version != 4)
+	{
+		return false;
+	}
+
+	const struct ipv4_hdr *const ipv4_hdr = (struct ipv4_hdr *) data;
+	if(ipv4_hdr->ihl*4 != sizeof(struct ipv4_hdr))
+	{
+		return false;
+	}
+
+	/* check if the checksum of the outer IP header is correct */
+	if(ip_fast_csum(data, sizeof(struct ipv4_hdr) / sizeof(uint32_t)) != 0)
+	{
+		return false;
+	}
+
+	const struct udphdr *udp_header = (const struct udphdr *) (data + sizeof(struct ipv4_hdr));
+	if(udp_header->len < sizeof(struct udphdr))
 	{
 		return false;
 	}
@@ -234,6 +281,10 @@ size_t c_create_context(struct rohc_comp *const comp, int profile,
 	{
 		c_tcp_create_from_pkt(&comp->contexts[cid_to_use], data);
 	}
+	else
+	{
+		c_udp_create(&comp->contexts[cid_to_use], data);
+	}
 
 	/* if creation is successful, mark the context as used */
 	comp->contexts[cid_to_use].used = 1;
@@ -245,7 +296,7 @@ size_t c_create_context(struct rohc_comp *const comp, int profile,
 void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
 		const uint8_t *data)
 {
-	struct sc_tcp_context *tcp_context = &(context->specific);
+	struct sc_tcp_context *tcp_context = &(context->tcp_specific);
 	const struct tcphdr *tcp;
 
 	tcp_context->ip_contexts_nr = 0;
@@ -310,6 +361,95 @@ void c_tcp_create_from_pkt(struct rohc_comp_ctxt *const context,
 	/* init the Master Sequence Number to a random value */
 	tcp_context->msn = lcg_rand() & 0xffff;
 	tcp_context->ack_stride = 0;
+}
+
+bool c_udp_create(struct rohc_comp_ctxt *const context, const uint8_t *data)
+{
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt;
+	struct sc_udp_context *udp_context;
+	const struct udphdr *udp;
+
+	/* create and initialize the generic part of the profile context */
+	rohc_comp_rfc3095_create(context, 16, ROHC_LSB_SHIFT_SN, data);
+	rfc3095_ctxt = &context->rfc3095_specific;
+
+	/* initialize SN to a random value (RFC 3095, 5.11.1) */
+	rfc3095_ctxt->sn = lcg_rand() & 0xffff;
+
+	/* check that transport protocol is UDP */
+	udp = (struct udphdr *) (data + sizeof(struct ipv4_hdr));
+
+	udp_context = &rfc3095_ctxt->specific;
+	/* initialize the UDP part of the profile context */
+	udp_context->udp_checksum_change_count = 0;
+
+	// memcpy is not a valid function in HLS!
+	//memcpy(&udp_context->old_udp, udp, sizeof(struct udphdr));
+	udp_context->old_udp.source = udp->source;
+	udp_context->old_udp.dest = udp->dest;
+	udp_context->old_udp.len = udp->len;
+	udp_context->old_udp.check = udp->check;
+	udp_context->send_udp_dynamic = -1;
+	rfc3095_ctxt->next_header_len = sizeof(struct udphdr);
+
+	return true;
+}
+
+void rohc_comp_rfc3095_create(struct rohc_comp_ctxt *const context, const size_t sn_bits_nr,
+                              const rohc_lsb_shift_t sn_shift, uint8_t *ip_pkt)
+{
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt = &context->rfc3095_specific;
+	const struct ipv4_hdr *const ipv4_hdr = (struct ipv4_hdr *) ip_pkt;
+
+	wlsb_init(&rfc3095_ctxt->sn_window, sn_bits_nr, ROHC_WLSB_WIDTH_MAX, sn_shift);
+	wlsb_init(&rfc3095_ctxt->msn_non_acked, 16, ROHC_WLSB_WIDTH_MAX, sn_shift);
+
+	/* step 3 */
+	ip_header_info_new(&rfc3095_ctxt->outer_ip_flags, ipv4_hdr->version);
+	rfc3095_ctxt->ip_hdr_nr = 1;
+
+	/* step 4 */
+	c_init_tmp_variables(&rfc3095_ctxt->rfc_tmp);
+
+	/* step 5 */
+	rfc3095_ctxt->next_header_proto = ipv4_hdr->protocol;
+	rfc3095_ctxt->next_header_len = 0;
+	rfc3095_ctxt->is_crc_static_3_cached_valid = false;
+	rfc3095_ctxt->is_crc_static_7_cached_valid = false;
+}
+
+void ip_header_info_new(struct ip_header_info *const header_info, uint8_t version)
+{
+	header_info->version = version;
+	header_info->is_first_header = true;
+	if(header_info->version == 4)
+	{
+		wlsb_init(&header_info->info.v4.ip_id_window, 16, ROHC_WLSB_WIDTH_MAX, ROHC_LSB_SHIFT_IP_ID);
+		header_info->tos_count = MAX_FO_COUNT;
+		header_info->ttl_count = MAX_FO_COUNT;
+		header_info->info.v4.df_count = MAX_FO_COUNT;
+		header_info->protocol_count = MAX_FO_COUNT;
+		header_info->info.v4.rnd_count = MAX_FO_COUNT;
+		header_info->info.v4.nbo_count = MAX_FO_COUNT;
+		header_info->info.v4.sid_count = MAX_FO_COUNT;
+	}
+}
+
+void c_init_tmp_variables(struct generic_tmp_vars *const tmp_vars)
+{
+	tmp_vars->changed_fields = MOD_ERROR;
+	tmp_vars->changed_fields2 = MOD_ERROR;
+	tmp_vars->send_static = -1;
+	tmp_vars->send_dynamic = -1;
+
+	/* do not send any bits of SN, outer/inner IP-IDs, outer/inner IPv6
+	 * extension header list by default */
+	tmp_vars->nr_sn_bits_less_equal_than_4 = 0;
+	tmp_vars->nr_sn_bits_more_than_4 = 0;
+	tmp_vars->nr_ip_id_bits = 0;
+	tmp_vars->nr_ip_id_bits2 = 0;
+
+	tmp_vars->packet_type = ROHC_PACKET_UNKNOWN;
 }
 
 uint16_t ip_fast_csum(const uint8_t *const iph, const size_t ihl)

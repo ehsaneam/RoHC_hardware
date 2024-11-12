@@ -34,6 +34,11 @@
 #define RSF_FIN_ONLY  0x01
 #define RSF_NONE      0x00
 
+#define MOD_TOS       0x0001
+#define MOD_PROTOCOL  0x0020
+#define MOD_TTL       0x0010
+#define MOD_ERROR 	  0x0008
+
 typedef enum
 {
 	ROHC_CRC_TYPE_NONE = 0,  /**< No CRC selected */
@@ -41,6 +46,14 @@ typedef enum
 	ROHC_CRC_TYPE_7 = 7,     /**< The CRC-7 type */
 	ROHC_CRC_TYPE_8 = 8,	 /**< The CRC-8 type */
 } rohc_crc_type_t;
+
+typedef enum
+{
+	ROHC_IP_HDR_NONE   = 0,  /**< No IP header selected */
+	ROHC_IP_HDR_FIRST  = 1,  /**< The first IP header is selected */
+	ROHC_IP_HDR_SECOND = 2,  /**< The second IP header is selected */
+	/* max 2 IP headers hanlded at the moment */
+} ip_header_pos_t;
 
 typedef enum
 {
@@ -246,6 +259,44 @@ struct ipv4_hdr
 
 } __attribute__((packed));
 
+struct ipv4_header_info
+{
+	struct c_wlsb ip_id_window;
+	struct ipv4_hdr old_ip;
+	size_t df_count;
+	size_t rnd_count;
+	size_t nbo_count;
+	size_t sid_count;
+	int rnd;
+	int nbo;
+	int sid;
+	int old_rnd;
+	int old_nbo;
+	int old_sid;
+	uint16_t id_delta;
+};
+
+struct ip_header_info
+{
+	int version;            ///< The version of the IP header
+	size_t tos_count;
+	size_t ttl_count;
+	size_t protocol_count;
+	bool is_first_header;
+	union
+	{
+		struct ipv4_header_info v4; ///< The IPv4-specific header info
+	} info;                        ///< The version specific header info
+};
+
+struct udphdr
+{
+	uint16_t source; /**< The source port of the UDP header */
+	uint16_t dest;   /**< The destination port of the UDP header */
+	uint16_t len;    /**< The length (in bytes) of the UDP packet (header + payload) */
+	uint16_t check;  /**< The checksum over of the UDP header + pseudo IP header */
+} __attribute__((packed));
+
 struct tcphdr
 {
 	uint16_t src_port;
@@ -306,6 +357,19 @@ struct tcp_tmp_variables
 	int ttl_irreg_chain_flag;
 };
 
+struct generic_tmp_vars
+{
+	unsigned short changed_fields;
+	unsigned short changed_fields2;
+	int send_static;
+	int send_dynamic;
+	size_t nr_sn_bits_less_equal_than_4;
+	size_t nr_sn_bits_more_than_4;
+	size_t nr_ip_id_bits;
+	size_t nr_ip_id_bits2;
+	uint8_t packet_type;
+};
+
 struct sc_tcp_context
 {
 	struct tcphdr old_tcphdr;
@@ -347,9 +411,38 @@ struct sc_tcp_context
 	uint32_t seq_num_residue;
 };
 
+struct sc_udp_context
+{
+	size_t udp_checksum_change_count;
+	struct udphdr old_udp;
+	int send_udp_dynamic;
+};
+
+struct rohc_comp_rfc3095_ctxt
+{
+	struct sc_udp_context specific;
+
+	struct generic_tmp_vars rfc_tmp;
+	struct c_wlsb sn_window;
+	struct c_wlsb msn_non_acked;
+	struct ip_header_info outer_ip_flags;
+
+	uint32_t sn;
+	uint32_t msn_of_last_ctxt_updating_pkt;
+	uint8_t crc_static_3_cached;
+	uint8_t crc_static_7_cached;
+
+	size_t ip_hdr_nr;
+	bool is_crc_static_3_cached_valid;
+	bool is_crc_static_7_cached_valid;
+	unsigned int next_header_proto;
+	unsigned int next_header_len;
+};
+
 struct rohc_comp_ctxt
 {
-	struct sc_tcp_context specific;
+	struct sc_tcp_context tcp_specific;
+	struct rohc_comp_rfc3095_ctxt rfc3095_specific;
 
 	int packet_type;
 	int num_sent_packets;
@@ -407,6 +500,8 @@ bool tcp_is_ack_scaled_possible(const uint16_t ack_stride,
 uint32_t rohc_bswap32(const uint32_t value);
 uint16_t rohc_bswap16(const uint16_t value);
 uint16_t swab16(const uint16_t value);
-uint8_t crc_calc_8(const uint8_t *const buf, const size_t size);
-uint8_t crc_calc_7(const uint8_t *const buf, const size_t size);
-uint8_t crc_calc_3(const uint8_t *const buf, const size_t size);
+uint8_t crc_calculate(const rohc_crc_type_t crc_type, const uint8_t *const data,
+                      const size_t length, const uint8_t init_val);
+uint8_t crc_calc_8(const uint8_t *const buf, const size_t size, const uint8_t init_val);
+uint8_t crc_calc_7(const uint8_t *const buf, const size_t size, const uint8_t init_val);
+uint8_t crc_calc_3(const uint8_t *const buf, const size_t size, const uint8_t init_val);

@@ -33,6 +33,10 @@ int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t unco
 	{
 		rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
 	}
+	else if( comp.contexts[cid].pid==ROHC_PROFILE_UDP )
+	{
+		rohc_hdr_size = c_udp_encode(&comp.contexts[cid], uncomp_data, rohc_packet, 2048);
+	}
 	else
 	{
 		rohc_hdr_size = c_uncompressed_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
@@ -69,6 +73,10 @@ int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t unco
 		if( comp.contexts[cid].pid==ROHC_PROFILE_TCP )
 		{
 			rohc_hdr_size = c_tcp_encode(&comp.contexts[cid], uncomp_data, uncomp_len, rohc_packet, 2048);
+		}
+		else if( comp.contexts[cid].pid==ROHC_PROFILE_UDP )
+		{
+			rohc_hdr_size = c_udp_encode(&comp.contexts[cid], uncomp_data, rohc_packet, 2048);
 		}
 		else
 		{
@@ -109,6 +117,10 @@ int rohc_get_payload_offset(size_t cid)
 	if( comp.contexts[cid].pid==ROHC_PROFILE_TCP )
 	{
 		payload_offset = sizeof(struct ipv4_hdr) + sizeof(struct tcphdr);
+	}
+	else if( comp.contexts[cid].pid==ROHC_PROFILE_UDP )
+	{
+		payload_offset = sizeof(struct ipv4_hdr) + sizeof(struct udphdr);
 	}
 	else
 	{

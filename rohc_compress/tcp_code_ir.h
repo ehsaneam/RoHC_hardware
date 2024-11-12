@@ -98,7 +98,7 @@ typedef struct
 
 } __attribute__((packed)) tcp_dynamic_t;
 
-int code_IR_packet(struct rohc_comp_ctxt *contecst,
+int tcp_code_IR_packet(struct rohc_comp_ctxt *contecst,
 				  const uint8_t *ip_pkt,
 				  uint8_t *const rohc_pkt,
 				  const size_t rohc_pkt_max_len,

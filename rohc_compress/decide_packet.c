@@ -1,5 +1,8 @@
 #include "decide_packet.h"
 
+///////////////////////////
+//			TCP			 //
+///////////////////////////
 int tcp_decide_packet(struct rohc_comp_ctxt *const context,
 		uint8_t *ip_pkt)
 {
@@ -36,7 +39,7 @@ rohc_packet_t tcp_decide_FO_SO_packet(const struct rohc_comp_ctxt *const context
                                              const struct tcphdr *const tcp,
                                              const bool crc7_at_least)
 {
-	const struct sc_tcp_context *tcp_context = &context->specific;
+	const struct sc_tcp_context *tcp_context = &context->tcp_specific;
 	rohc_packet_t packet_type;
 
 	if(tcp_context->tmp.nr_msn_bits > 4)
@@ -162,7 +165,7 @@ rohc_packet_t tcp_decide_FO_SO_packet_seq(const struct rohc_comp_ctxt *const con
                                                  const struct tcphdr *const tcp,
                                                  const bool crc7_at_least)
 {
-	const struct sc_tcp_context *tcp_context = &context->specific;
+	const struct sc_tcp_context *tcp_context = &context->tcp_specific;
 	const uint32_t seq_num_hbo = rohc_bswap32(tcp->seq_num);
 	const uint32_t ack_num_hbo = rohc_bswap32(tcp->ack_num);
 	size_t nr_seq_bits_32767; /* min bits required to encode TCP seqnum with p = 32767 */
@@ -365,6 +368,7 @@ rohc_packet_t tcp_decide_FO_SO_packet_rnd456(bool tcp_window_changed, const bool
 		return ROHC_PACKET_UNKNOWN;
 	}
 }
+
 rohc_packet_t tcp_decide_FO_SO_packet_rnd789(uint8_t ack_flag, size_t nr_ack_bits_8191, const bool crc7_at_least,
 		bool tcp_seq_num_changed, size_t nr_seq_bits_65535, bool tcp_ack_num_changed, size_t nr_ack_bits_16383,
 		size_t seq_num_scaling_nr, size_t nr_seq_scaled_bits)
@@ -388,6 +392,7 @@ rohc_packet_t tcp_decide_FO_SO_packet_rnd789(uint8_t ack_flag, size_t nr_ack_bit
 		return ROHC_PACKET_UNKNOWN;
 	}
 }
+
 rohc_packet_t tcp_decide_FO_SO_packet_rndab(const bool crc7_at_least, size_t nr_seq_bits_8191,
 		uint8_t ack_flag, size_t nr_ack_bits_8191, size_t nr_ack_bits_16383, size_t nr_seq_bits_65535)
 {
@@ -404,11 +409,12 @@ rohc_packet_t tcp_decide_FO_SO_packet_rndab(const bool crc7_at_least, size_t nr_
 		return ROHC_PACKET_TCP_CO_COMMON;
 	}
 }
+
 rohc_packet_t tcp_decide_FO_SO_packet_rnd(const struct rohc_comp_ctxt *const context,
                                                  const struct tcphdr *const tcp,
                                                  const bool crc7_at_least)
 {
-	const struct sc_tcp_context *tcp_context = &context->specific;
+	const struct sc_tcp_context *tcp_context = &context->tcp_specific;
 	const uint32_t seq_num_hbo = rohc_bswap32(tcp->seq_num);
 	const uint32_t ack_num_hbo = rohc_bswap32(tcp->ack_num);
 	size_t nr_seq_bits_65535 = wlsb_get_minkp_32bits(&tcp_context->seq_wlsb, seq_num_hbo, 65535);
@@ -490,4 +496,138 @@ rohc_packet_t tcp_decide_FO_SO_packet_rnd(const struct rohc_comp_ctxt *const con
 	}
 
 	return ROHC_PACKET_TCP_CO_COMMON;
+}
+
+///////////////////////////
+//			UDP			 //
+///////////////////////////
+uint8_t udp_decide_packet(struct rohc_comp_ctxt *const context)
+{
+	struct rohc_comp_rfc3095_ctxt *const rfc3095_ctxt = &context->rfc3095_specific;
+	uint8_t packet;
+
+	switch(context->state)
+	{
+		case ROHC_COMP_STATE_IR:
+		{
+			context->ir_count++;
+			packet = ROHC_PACKET_IR;
+			break;
+		}
+
+		case ROHC_COMP_STATE_FO:
+		{
+			context->fo_count++;
+			packet = c_ip_decide_FO_packet(context);
+			break;
+		}
+
+		case ROHC_COMP_STATE_SO:
+		{
+			context->so_count++;
+			packet = c_ip_decide_SO_packet(context);
+			break;
+		}
+	}
+	return packet;
+}
+
+uint8_t c_ip_decide_FO_packet(const struct rohc_comp_ctxt *context)
+{
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt;
+	size_t nr_sn_bits_more_than_4;
+	uint8_t packet;
+
+	rfc3095_ctxt = &context->rfc3095_specific;
+	nr_sn_bits_more_than_4 = rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4;
+
+	if(rfc3095_ctxt->rfc_tmp.send_static &&
+	        rohc_comp_rfc3095_is_sn_possible(rfc3095_ctxt, 5, 8))
+	{
+		packet = ROHC_PACKET_UOR_2;
+	}
+	else if(rfc3095_ctxt->ip_hdr_nr == 1 && rfc3095_ctxt->rfc_tmp.send_dynamic > 2)
+	{
+		packet = ROHC_PACKET_IR_DYN;
+	}
+	else if(rohc_comp_rfc3095_is_sn_possible(rfc3095_ctxt, 5, 8))
+	{
+		/* UOR-2 packet can be used only if SN stand on <= 13 bits (5 bits in
+		   base header + 8 bits in extension 3) */
+		packet = ROHC_PACKET_UOR_2;
+	}
+	else
+	{
+		/* UOR-2 packet can not be used, use IR-DYN instead */
+		packet = ROHC_PACKET_IR_DYN;
+	}
+
+	return packet;
+}
+
+uint8_t c_ip_decide_SO_packet(const struct rohc_comp_ctxt *context)
+{
+	const struct rohc_comp_rfc3095_ctxt *const rfc3095_ctxt = &context->rfc3095_specific;
+	size_t nr_sn_bits_less_equal_than_4;
+	size_t nr_sn_bits_more_than_4;
+	uint8_t packet;
+
+	nr_sn_bits_less_equal_than_4 = rfc3095_ctxt->rfc_tmp.nr_sn_bits_less_equal_than_4;
+	nr_sn_bits_more_than_4 = rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4;
+
+	if(rfc3095_ctxt->ip_hdr_nr == 1) /* single IP header */
+	{
+		if(rohc_comp_rfc3095_is_sn_possible(rfc3095_ctxt, 4, 0) &&
+		   no_outer_ip_id_bits_required(rfc3095_ctxt))
+		{
+			packet = ROHC_PACKET_UO_0;
+		}
+		else if(rohc_comp_rfc3095_is_sn_possible(rfc3095_ctxt, 5, 0) &&
+				rfc3095_is_outer_ip_id_bits_possible(rfc3095_ctxt, 6))
+		{
+			packet = ROHC_PACKET_UO_1; /* IPv4 only */
+		}
+		else if(rohc_comp_rfc3095_is_sn_possible(rfc3095_ctxt, 5, 8))
+		{
+			/* UOR-2 packet can be used only if SN stand on <= 13 bits (5 bits in
+			   base header + 8 bits in extension 3) */
+			packet = ROHC_PACKET_UOR_2;
+		}
+		else
+		{
+			/* UOR-2 packet can not be used, use IR-DYN instead */
+			packet = ROHC_PACKET_IR_DYN;
+		}
+	}
+
+	return packet;
+}
+
+bool rohc_comp_rfc3095_is_sn_possible(const struct rohc_comp_rfc3095_ctxt *const rfc3095_ctxt,
+                                      const size_t bits_nr,
+                                      const size_t add_bits_nr)
+{
+	const size_t required_bits =
+		(bits_nr <= 4 ? rfc3095_ctxt->rfc_tmp.nr_sn_bits_less_equal_than_4 :
+		 rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4);
+	const size_t required_add_bits =
+		((bits_nr + add_bits_nr) <= 4 ? rfc3095_ctxt->rfc_tmp.nr_sn_bits_less_equal_than_4 :
+		 rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4);
+
+	return (required_bits <= bits_nr || required_add_bits <= (bits_nr + add_bits_nr));
+}
+
+bool rfc3095_is_outer_ip_id_bits_possible(const struct rohc_comp_rfc3095_ctxt *const ctxt,
+                                                const size_t max_ip_id_bits_nr)
+{
+	return (ctxt->outer_ip_flags.version == 4 &&
+	        ctxt->outer_ip_flags.info.v4.rnd != 1 &&
+	        ctxt->rfc_tmp.nr_ip_id_bits <= max_ip_id_bits_nr);
+}
+
+bool no_outer_ip_id_bits_required(const struct rohc_comp_rfc3095_ctxt *const ctxt)
+{
+	return (ctxt->outer_ip_flags.version != 4 ||
+	        ctxt->outer_ip_flags.info.v4.rnd == 1 ||
+	        ctxt->rfc_tmp.nr_ip_id_bits == 0);
 }

@@ -556,7 +556,7 @@ typedef struct
 
 } __attribute__((packed)) co_common_t;
 
-int code_CO_packet(struct rohc_comp_ctxt *const context,
+int tcp_code_CO_packet(struct rohc_comp_ctxt *const context,
 				uint8_t *ip_pkt, uint8_t *const rohc_pkt,
 				const size_t rohc_pkt_max_len,
 				const int packet_type);
