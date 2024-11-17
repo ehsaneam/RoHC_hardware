@@ -1,6 +1,6 @@
-#include "code_co.h"
+#include "tcp_code_co.h"
 
-int code_CO_packet(struct rohc_comp_ctxt *const context,
+int tcp_code_CO_packet(struct rohc_comp_ctxt *const context,
 				uint8_t *ip_pkt, uint8_t *const rohc_pkt,
 				const size_t rohc_pkt_max_len,
 				const int packet_type)
@@ -10,7 +10,7 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 
 	uint8_t *rohc_remain_data = rohc_pkt;
 	size_t rohc_remain_len = rohc_pkt_max_len;
-	struct sc_tcp_context *const tcp_context = &context->specific;
+	struct sc_tcp_context *const tcp_context = &context->tcp_specific;
 	const struct ipv4_hdr *const ipv4 = (struct ipv4_hdr *) ip_pkt;
 	const struct tcphdr *tcp;
 
@@ -36,11 +36,11 @@ int code_CO_packet(struct rohc_comp_ctxt *const context,
 	   packet_type == ROHC_PACKET_TCP_RND_8 ||
 	   packet_type == ROHC_PACKET_TCP_CO_COMMON)
 	{
-		crc_computed = crc_calc_7(ip_pkt, payload_offset);
+		crc_computed = crc_calc_7(ip_pkt, payload_offset, CRC_INIT_7);
 	}
 	else
 	{
-		crc_computed = crc_calc_3(ip_pkt, payload_offset);
+		crc_computed = crc_calc_3(ip_pkt, payload_offset, CRC_INIT_3);
 	}
 
 

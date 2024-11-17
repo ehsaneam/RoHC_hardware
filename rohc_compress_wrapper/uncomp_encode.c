@@ -103,7 +103,7 @@ int uncompressed_code_IR_packet(const struct rohc_comp_ctxt *context, uint8_t *i
 
 	/* part 5 */
 	rohc_pkt[counter] = 0;
-	rohc_pkt[counter] = crc_calc_8(rohc_pkt, counter);
+	rohc_pkt[counter] = crc_calc_8(rohc_pkt, counter, CRC_INIT_8);
 	counter++;
 
 	return counter;

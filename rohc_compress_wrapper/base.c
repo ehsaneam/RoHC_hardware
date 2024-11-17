@@ -32,8 +32,7 @@ void rohc_comp_periodic_down_transition(struct rohc_comp_ctxt *const context)
 	}
 }
 
-void rohc_comp_change_state(struct rohc_comp_ctxt *const context,
-                            const int new_state)
+void rohc_comp_change_state(struct rohc_comp_ctxt *const context, const int new_state)
 {
 	if(new_state != context->state)
 	{
@@ -45,6 +44,20 @@ void rohc_comp_change_state(struct rohc_comp_ctxt *const context,
 		/* change state */
 		context->state = new_state;
 	}
+}
+
+uint16_t ipv4_get_id_nbo(uint8_t *data, unsigned int nbo)
+{
+	const struct ipv4_hdr *const ipv4_hdr = (struct ipv4_hdr *) data;
+	uint16_t id = ipv4_hdr->id;
+
+	if(!nbo)
+	{
+		/* If IP-ID is not transmitted in Network Byte Order, swap the two bytes */
+		id = swab16(id);
+	}
+
+	return id;
 }
 
 uint8_t wlsb_get_kp_8bits(const struct c_wlsb *const wlsb,
@@ -383,11 +396,37 @@ uint16_t swab16(const uint16_t value)
 	return ((value & 0x00ff) << 8) | ((value & 0xff00) >> 8);
 }
 
+uint8_t crc_calculate(const rohc_crc_type_t crc_type, const uint8_t *const data,
+                      const size_t length, const uint8_t init_val)
+{
+	uint8_t crc;
+
+	/* call the function that corresponds to the CRC type */
+	switch(crc_type)
+	{
+		case ROHC_CRC_TYPE_8:
+			crc = crc_calc_8(data, length, init_val);
+			break;
+		case ROHC_CRC_TYPE_7:
+			crc = crc_calc_7(data, length, init_val);
+			break;
+		case ROHC_CRC_TYPE_3:
+			crc = crc_calc_3(data, length, init_val);
+			break;
+		case ROHC_CRC_TYPE_NONE:
+		default:
+			crc = 0;
+			break;
+	}
+
+	return crc;
+}
+
 uint8_t crc_calc_8(const uint8_t *const buf,
-				 const size_t size)
+				 const size_t size, const uint8_t init_val)
 {
 	size_t i;
-	uint8_t crc = CRC_INIT_8;
+	uint8_t crc = init_val;
 	const uint8_t crc_table_8[256] = {
 			0,145,227,114,7,150,228,117,14,159,237,124,9,
 			152,234,123,28,141,255,110,27,138,248,105,18,
@@ -420,10 +459,10 @@ uint8_t crc_calc_8(const uint8_t *const buf,
 	return crc;
 }
 
-uint8_t crc_calc_7(const uint8_t *const buf, const size_t size)
+uint8_t crc_calc_7(const uint8_t *const buf, const size_t size, const uint8_t init_val)
 {
 	size_t i;
-	uint8_t crc = CRC_INIT_7;
+	uint8_t crc = init_val;
 	const uint8_t crc_table_7[256] = {
 			0,64,115,51,21,85,102,38,42,106,89,25,63,127,
 			76,12,84,20,39,103,65,1,50,114,126,62,13,77,
@@ -454,10 +493,10 @@ uint8_t crc_calc_7(const uint8_t *const buf, const size_t size)
 	return crc;
 }
 
-uint8_t crc_calc_3(const uint8_t *const buf, const size_t size)
+uint8_t crc_calc_3(const uint8_t *const buf, const size_t size, const uint8_t init_val)
 {
 	size_t i;
-	uint8_t crc = CRC_INIT_3;
+	uint8_t crc = init_val;
 	const uint8_t crc_table_3[256] = {
 			0,6,1,7,2,4,3,5,4,2,5,3,6,0,7,1,5,3,4,2,7,1,6,
 			0,1,7,0,6,3,5,2,4,7,1,6,0,5,3,4,2,3,5,2,4,1,7,

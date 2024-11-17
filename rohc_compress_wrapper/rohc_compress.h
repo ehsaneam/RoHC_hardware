@@ -2,6 +2,7 @@
 #define ROHC_COMPRESS_H
 
 #include "tcp_encode.h"
+#include "udp_encode.h"
 #include "uncomp_encode.h"
 #include "ctxt_find.h"
 #include "base.h"

@@ -1,6 +1,6 @@
-#include "code_ir.h"
+#include "tcp_code_ir.h"
 
-int code_IR_packet(struct rohc_comp_ctxt *contecst,
+int tcp_code_IR_packet(struct rohc_comp_ctxt *contecst,
 				  const uint8_t *ip_pkt,
 				  uint8_t *const rohc_pkt,
 				  const size_t rohc_pkt_max_len,
@@ -8,7 +8,7 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 {
 #pragma HLS INTERFACE m_axi port = ip_pkt depth = 1500
 #pragma HLS INTERFACE m_axi port = rohc_pkt depth = 1500
-	struct sc_tcp_context *const tcp_context = &contecst->specific;
+	struct sc_tcp_context *const tcp_context = &contecst->tcp_specific;
 	uint8_t *rohc_remain_data = rohc_pkt;
 	size_t rohc_remain_len = rohc_pkt_max_len;
 	size_t first_position;
@@ -81,7 +81,7 @@ int code_IR_packet(struct rohc_comp_ctxt *contecst,
 		rohc_hdr_len += ret;
 	}
 	/* IR(-CR|-DYN) header was successfully built, compute the CRC */
-	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len);
+	rohc_pkt[crc_position] = crc_calc_8(rohc_pkt, rohc_hdr_len, CRC_INIT_8);
 	return rohc_hdr_len;
 }
 

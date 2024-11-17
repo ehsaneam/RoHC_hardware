@@ -15,9 +15,9 @@ int main()
 	int exp_hdrs_len[IN_LEN];
 
 	FILE *fp = fopen("./../../../resources/inputs","r");
-	FILE *fp_out = fopen("./../../../resources/outputs","w");
+//	FILE *fp_out = fopen("./../../../resources/outputs","w");
 //	FILE *fp = fopen("resources/inputs","r");
-	if( fp==NULL || fp_out==NULL )
+	if( fp==NULL /*|| fp_out==NULL*/ )
 	{
 		printf("***********************--->file nis\n");
 		return -1;
@@ -25,8 +25,7 @@ int main()
 
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
-		fscanf(fp, "len:%lu, sec:%lu, uncomp_data:",
-				&uncomp_len[i], &uncomp_time);
+		fscanf(fp, "len:%lu, sec:%lu, uncomp_data:", &uncomp_len[i], &uncomp_time);
 		for( j=0 ; j<uncomp_len[i] ; j++)
 		{
 			fscanf(fp, "%hhu ", &uncomp_data[i][j]);
@@ -61,19 +60,19 @@ int main()
 			break;
 		}
 
-		for( j=0 ; j<exp_rohc_len[i] ; j++ )
-		{
-			if( exp_rohc_pkts[i][j]!=rohc_packets[i][j] )
-			{
-				printf("*********************** %d-%d (%hhu,%hhu)\n", i, j,
-						exp_rohc_pkts[i][j], rohc_packets[i][j]);
+//		for( j=0 ; j<exp_rohc_len[i] ; j++ )
+//		{
+//			if( exp_rohc_pkts[i][j]!=rohc_packets[i][j] )
+//			{
+//				printf("*********************** %d-%d (%hhu,%hhu)\n", i, j,
+//						exp_rohc_pkts[i][j], rohc_packets[i][j]);
 //				failed = 1;
-			}
-			fprintf(fp_out, "%c", rohc_packets[i][j]);
-		}
-		fprintf(fp_out, "\n");
+//			}
+//			fprintf(fp_out, "%c", rohc_packets[i][j]);
+//		}
+//		fprintf(fp_out, "\n");
 	}
-	fclose(fp_out);
+//	fclose(fp_out);
 
 	if( failed )
 	{

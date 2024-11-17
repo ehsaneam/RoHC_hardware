@@ -1,9 +1,12 @@
 #include "uncomp_fields.h"
 
+///////////////////////////
+//			TCP			 //
+///////////////////////////
 bool tcp_encode_uncomp_fields(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt)
 {
 #pragma HLS INTERFACE m_axi port = ip_pkt depth = 1500
-	struct sc_tcp_context *const tcp_context = &context->specific;
+	struct sc_tcp_context *const tcp_context = &context->tcp_specific;
 
 	/* how many bits are required to encode the new SN ? */
 	tcp_context->tmp.nr_msn_bits =
@@ -29,7 +32,7 @@ bool tcp_encode_uncomp_fields(struct rohc_comp_ctxt *const context, uint8_t *ip_
 
 bool tcp_encode_uncomp_ip_fields(struct rohc_comp_ctxt *const context, const struct ipv4_hdr *const ip)
 {
-	struct sc_tcp_context *tcp_context = &context->specific;
+	struct sc_tcp_context *tcp_context = &context->tcp_specific;
 
 	ipv4_context_t *inner_ip_ctxt = &(tcp_context->ip_context);
 
@@ -135,7 +138,7 @@ bool tcp_encode_uncomp_ip_fields(struct rohc_comp_ctxt *const context, const str
 bool tcp_encode_uncomp_tcp_fields(struct rohc_comp_ctxt *const context,
 								  const struct tcphdr *const tcp)
 {
-	struct sc_tcp_context *const tcp_context = &context->specific;
+	struct sc_tcp_context *const tcp_context = &context->tcp_specific;
 	const uint32_t seq_num_hbo = rohc_bswap32(tcp->seq_num);
 	const uint32_t ack_num_hbo = rohc_bswap32(tcp->ack_num);
 	tcp_context->tmp.tcp_ack_flag_changed =
@@ -311,10 +314,8 @@ void calc_wlsbs(struct c_wlsb *seq_scaled_wlsb, struct c_wlsb *ack_wlsb, struct 
 	}
 }
 
-void c_field_scaling(uint32_t *const scaled_value,
-                     uint32_t *const residue_field,
-                     const uint32_t scaling_factor,
-                     const uint32_t unscaled_value)
+void c_field_scaling(uint32_t *const scaled_value, uint32_t *const residue_field,
+                     const uint32_t scaling_factor, const uint32_t unscaled_value)
 {
 	if(scaling_factor == 0)
 	{
@@ -339,7 +340,59 @@ void c_field_scaling(uint32_t *const scaled_value,
 	}
 }
 
+///////////////////////////
+//			UDP			 //
+///////////////////////////
+bool udp_encode_uncomp_fields(struct rohc_comp_ctxt *const context, uint8_t *ip_pkt)
+{
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt;
+	rfc3095_ctxt = &context->rfc3095_specific;
 
+	rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4 = wlsb_get_minkp_16bits(&rfc3095_ctxt->sn_window,
+			rfc3095_ctxt->sn, rfc3095_ctxt->sn_window.p);
+	rfc3095_ctxt->rfc_tmp.nr_sn_bits_less_equal_than_4 = rfc3095_ctxt->rfc_tmp.nr_sn_bits_more_than_4;
+
+	/* add the new SN to the W-LSB encoding object */
+	c_add_wlsb(&rfc3095_ctxt->sn_window, rfc3095_ctxt->sn, rfc3095_ctxt->sn);
+
+	/* update info related to the IP-ID of the outer header
+	 * only if header is IPv4 */
+	const struct ipv4_hdr *const ipv4 = (struct ipv4_hdr *) ip_pkt;
+	if(ipv4->version == 4)
+	{
+		uint16_t id = ipv4->id;
+		if(!rfc3095_ctxt->outer_ip_flags.info.v4.nbo)
+		{
+			id = swab16(id);
+		}
+		rfc3095_ctxt->outer_ip_flags.info.v4.id_delta = rohc_bswap16(id) - rfc3095_ctxt->sn;
+
+		/* how many bits are required to encode the new IP-ID / SN delta ? */
+		if(rfc3095_ctxt->outer_ip_flags.info.v4.sid)
+		{
+			/* IP-ID is constant, no IP-ID bit to transmit */
+			rfc3095_ctxt->rfc_tmp.nr_ip_id_bits = 0;
+		}
+		else
+		{
+			/* send only required bits in FO or SO states */
+			rfc3095_ctxt->rfc_tmp.nr_ip_id_bits =
+					wlsb_get_minkp_16bits(&rfc3095_ctxt->outer_ip_flags.info.v4.ip_id_window,
+				                  rfc3095_ctxt->outer_ip_flags.info.v4.id_delta,
+								  rfc3095_ctxt->outer_ip_flags.info.v4.ip_id_window.p);
+		}
+
+		/* add the new IP-ID / SN delta to the W-LSB encoding object */
+		c_add_wlsb(&rfc3095_ctxt->outer_ip_flags.info.v4.ip_id_window, rfc3095_ctxt->sn,
+		           rfc3095_ctxt->outer_ip_flags.info.v4.id_delta);
+	}
+
+	return true;
+}
+
+///////////////////////////
+//		  COMMON		 //
+///////////////////////////
 bool rohc_packet_carry_crc_7_or_8(const rohc_packet_t packet_type)
 {
 	bool carry_crc_7_or_8;
