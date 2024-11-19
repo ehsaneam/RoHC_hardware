@@ -2,24 +2,16 @@
 
 struct rohc_comp comp;
 
-int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t uncomp_len,
-		uint8_t *const rohc_packet, bool reset)
+int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t uncomp_len, uint8_t *const rohc_packet)
 {
 #pragma HLS INTERFACE m_axi port = uncomp_data depth = 1500
 #pragma HLS INTERFACE m_axi port = rohc_packet depth = 1500
 
-	if( !reset )
-	{
-		comp.num_contexts_used = 0;
-		for( int i=0 ; i<MAX_CONTEXTS ; i++ )
-		{
-			comp.contexts[i].used = 0;
-		}
-	}
-
 	int rohc_hdr_size;
 	size_t payload_size;
 	size_t payload_offset;
+
+	rohc_update_time(&comp, uncomp_time);
 
 	/* find the best context for the packet */
 	size_t cid = rohc_comp_find_ctxt(&comp, uncomp_data, -1, uncomp_time);
@@ -107,7 +99,49 @@ int rohc_compress4(uint8_t *const uncomp_data, uint16_t uncomp_time, size_t unco
 
 	comp.contexts[cid].num_sent_packets++;
 
-	return rohc_hdr_size;
+	return payload_size + rohc_hdr_size;
+}
+
+void rohc_update_time(struct rohc_comp *const comp, uint16_t uncomp_time)
+{
+	if( comp->last_arrival_time > uncomp_time ) // overflowed counter
+	{
+		int num_used = 0, i, j;
+		int context_list[ROHC_SMALL_CID_MAX+1];
+
+		// extract used contexts
+		for( i=0 ; i<ROHC_SMALL_CID_MAX+1 ; i++ )
+		{
+			if( comp->contexts[i].used )
+			{
+				context_list[num_used] = i;
+				num_used++;
+			}
+		}
+
+		// sort used contexts
+		for( i=0 ; i<num_used ; i++ )
+		{
+#pragma HLS loop_tripcount min=0 max=16
+			for( j=i+1 ; j<num_used ; j++ )
+			{
+#pragma HLS loop_tripcount min=0 max=15
+				if( comp->contexts[context_list[i]].latest_used > comp->contexts[context_list[j]].latest_used )
+				{
+					int temp = context_list[j];
+					context_list[j] = context_list[i];
+					context_list[i] = temp;
+				}
+			}
+		}
+
+		// update time with re-zerod! values
+		for( i=0 ; i<num_used ; i++ )
+		{
+#pragma HLS loop_tripcount min=0 max=16
+			comp->contexts[context_list[i]].latest_used = i;
+		}
+	}
 }
 
 int rohc_get_payload_offset(size_t cid)

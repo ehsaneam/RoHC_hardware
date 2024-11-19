@@ -1,6 +1,5 @@
-#include <hls_stream.h>
+#include "rohc_compress.h"
+#include "base.h"
 
-#define ETH_HDR_LEN 14
-#define TOTAL_HDR_LEN (sizeof(struct ipv4_hdr) + sizeof(struct tcphdr) + ETH_HDR_LEN)
-
-void read_hdr(hls::stream<uint8_t> *input_stream, uint8_t *hdr_buf);
+int rohc_compress_wrapper4(uint8_t *const input_stream, uint16_t input_time, size_t uncomp_len, uint8_t *output_mem);
+uint32_t calculate_crc32(const uint8_t *data, size_t length);

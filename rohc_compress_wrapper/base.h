@@ -464,6 +464,7 @@ struct rohc_comp
 {
 	struct rohc_comp_ctxt contexts[MAX_CONTEXTS];
 	size_t num_contexts_used;
+	uint16_t last_arrival_time;
 };
 
 void rohc_comp_periodic_down_transition(struct rohc_comp_ctxt *const context);

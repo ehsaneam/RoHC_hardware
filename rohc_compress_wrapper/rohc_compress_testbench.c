@@ -1,4 +1,4 @@
-#include "rohc_compress.h"
+#include "rohc_compress_wrapper.h"
 
 #define IN_LEN 40
 
@@ -11,8 +11,7 @@ int main()
 	uint8_t rohc_packets[IN_LEN][2048];
 	uint8_t exp_rohc_pkts[IN_LEN][2048];
 	size_t uncomp_len[IN_LEN];
-	size_t  exp_rohc_len[IN_LEN];
-	int exp_hdrs_len[IN_LEN];
+	int exp_frame_len[IN_LEN];
 
 	FILE *fp = fopen("./../../../resources/inputs","r");
 //	FILE *fp_out = fopen("./../../../resources/outputs","w");
@@ -30,8 +29,8 @@ int main()
 		{
 			fscanf(fp, "%hhu ", &uncomp_data[i][j]);
 		}
-		fscanf(fp, ", rohc_len:%lu, hdr_len:%d, rohc_data:", &exp_rohc_len[i], &exp_hdrs_len[i]);
-		for( j=0 ; j<exp_rohc_len[i] ; j++)
+		fscanf(fp, ", frame_len:%d, rohc_data:", &exp_frame_len[i]);
+		for( j=0 ; j<exp_frame_len[i] ; j++)
 		{
 			fscanf(fp, "%hhu ", &exp_rohc_pkts[i][j]);
 		}
@@ -42,20 +41,11 @@ int main()
 
 	for( i=0 ; i<IN_LEN ; i++ )
 	{
-		bool reset;
-		if( i==0 )
-		{
-			reset = 0;
-		}
-		else
-		{
-			reset = 1;
-		}
-		int ret = rohc_compress4(uncomp_data[i], uncomp_time[i], uncomp_len[i], rohc_packets[i], reset);
+		int ret = rohc_compress_wrapper4(uncomp_data[i], uncomp_time[i], uncomp_len[i], rohc_packets[i]);
 
-		if( ret!=exp_hdrs_len[i] )
+		if( ret!=exp_frame_len[i] )
 		{
-			printf("*********************** %d)%d %d\n", i, ret, exp_hdrs_len[i]);
+			printf("*********************** %d)%d %d\n", i, ret, exp_frame_len[i]);
 			failed = 1;
 			break;
 		}
