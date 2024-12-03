@@ -452,6 +452,7 @@ uint8_t crc_calc_8(const uint8_t *const buf,
 
 	for(i = 0; i < size; i++)
 	{
+//#pragma HLS unroll
 #pragma HLS loop_tripcount min=1 max=40
 		crc = crc_table_8[buf[i] ^ crc];
 	}
@@ -486,6 +487,7 @@ uint8_t crc_calc_7(const uint8_t *const buf, const size_t size, const uint8_t in
 
 	for(i = 0; i < size; i++)
 	{
+//#pragma HLS unroll
 #pragma HLS loop_tripcount min=1 max=40
 		crc = crc_table_7[buf[i] ^ (crc & 127)];
 	}
@@ -514,6 +516,7 @@ uint8_t crc_calc_3(const uint8_t *const buf, const size_t size, const uint8_t in
 
 	for(i = 0; i < size; i++)
 	{
+//#pragma HLS unroll
 #pragma HLS loop_tripcount min=1 max=40
 		crc = crc_table_3[buf[i] ^ (crc & 7)];
 	}
